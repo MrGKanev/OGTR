@@ -588,21 +588,63 @@
     function searchLines(query) {
         const normalizedQuery = query.toLowerCase().trim();
 
+        // Get or create stop results container
+        let stopResultsContainer = document.getElementById('stopSearchResults');
+        if (!stopResultsContainer) {
+            stopResultsContainer = document.createElement('div');
+            stopResultsContainer.id = 'stopSearchResults';
+            stopResultsContainer.className = 'stop-search-results';
+            elements.linesList.parentNode.insertBefore(stopResultsContainer, elements.linesList);
+        }
+
+        // Clear previous stop results
+        stopResultsContainer.textContent = '';
+        stopResultsContainer.style.display = 'none';
+
+        if (normalizedQuery === '') {
+            // Show all lines when query is empty
+            elements.linesList.querySelectorAll('.line-item').forEach(item => {
+                item.style.display = 'flex';
+            });
+            elements.linesList.querySelectorAll('.line-group').forEach(group => {
+                group.style.display = 'block';
+            });
+            return;
+        }
+
+        // Search for matching stops
+        const matchingStops = STOP_MARKERS.filter(stop =>
+            stop.name.toLowerCase().includes(normalizedQuery)
+        );
+
+        // If stops found, display them with bus info and arrival times
+        if (matchingStops.length > 0) {
+            stopResultsContainer.style.display = 'block';
+
+            const title = document.createElement('div');
+            title.className = 'stop-results-title';
+            title.textContent = 'Спирки:';
+            title.style.cssText = 'font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 0.875rem;';
+            stopResultsContainer.appendChild(title);
+
+            matchingStops.forEach(stop => {
+                const stopCard = createStopSearchResult(stop);
+                stopResultsContainer.appendChild(stopCard);
+            });
+        }
+
+        // Also filter lines as before
         elements.linesList.querySelectorAll('.line-item').forEach(item => {
             const lineId = item.dataset.lineId;
             const line = getLineById(lineId);
 
-            if (normalizedQuery === '') {
-                item.style.display = 'flex';
-            } else {
-                const matchesNumber = line.number.includes(normalizedQuery);
-                const matchesRoute = line.route.toLowerCase().includes(normalizedQuery);
-                const matchesStops = line.stops.some(stop =>
-                    stop.toLowerCase().includes(normalizedQuery)
-                );
+            const matchesNumber = line.number.includes(normalizedQuery);
+            const matchesRoute = line.route.toLowerCase().includes(normalizedQuery);
+            const matchesStops = line.stops.some(stop =>
+                stop.toLowerCase().includes(normalizedQuery)
+            );
 
-                item.style.display = (matchesNumber || matchesRoute || matchesStops) ? 'flex' : 'none';
-            }
+            item.style.display = (matchesNumber || matchesRoute || matchesStops) ? 'flex' : 'none';
         });
 
         // Show/hide group titles based on visible items
@@ -612,6 +654,112 @@
             const allHidden = hiddenItems > 0 && visibleItems === 0;
             group.style.display = allHidden ? 'none' : 'block';
         });
+    }
+
+    /**
+     * Create a stop search result card showing buses and arrival times
+     */
+    function createStopSearchResult(stop) {
+        const card = document.createElement('div');
+        card.className = 'stop-search-card';
+        card.style.cssText = 'background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 8px; cursor: pointer;';
+
+        // Stop name header
+        const header = document.createElement('div');
+        header.className = 'stop-card-header';
+        header.style.cssText = 'font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;';
+
+        const icon = document.createElement('span');
+        icon.textContent = '📍';
+        header.appendChild(icon);
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = stop.name;
+        header.appendChild(nameSpan);
+
+        card.appendChild(header);
+
+        // Lines serving this stop with arrival times
+        const linesContainer = document.createElement('div');
+        linesContainer.className = 'stop-lines-container';
+        linesContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px;';
+
+        stop.lines.forEach(lineId => {
+            const line = getLineById(lineId);
+            if (!line) return;
+
+            const isTrolley = lineId.startsWith('T');
+            const lineRow = document.createElement('div');
+            lineRow.className = 'stop-line-row';
+            lineRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 4px 0;';
+
+            // Line badge and info
+            const lineInfo = document.createElement('div');
+            lineInfo.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+
+            const badge = document.createElement('span');
+            badge.className = 'line-badge ' + (isTrolley ? 'trolleybus' : 'bus');
+            badge.textContent = line.number;
+            badge.style.cssText = 'cursor: pointer; font-size: 0.75rem; padding: 2px 6px;';
+            badge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectLine(lineId);
+            });
+
+            const routeName = document.createElement('span');
+            routeName.textContent = line.route;
+            routeName.style.cssText = 'font-size: 0.75rem; color: #64748b; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+
+            lineInfo.appendChild(badge);
+            lineInfo.appendChild(routeName);
+
+            // Arrival time estimation
+            const arrivalTime = document.createElement('span');
+            arrivalTime.className = 'arrival-time';
+
+            if (typeof calculateEstimatedArrival === 'function') {
+                const arrival = calculateEstimatedArrival(line, stop.name);
+                arrivalTime.textContent = arrival.message;
+
+                if (!arrival.available) {
+                    // Not running - red color
+                    arrivalTime.style.cssText = 'font-size: 0.75rem; color: #dc2626; font-weight: 500;';
+                } else if (arrival.minutesUntil <= 3) {
+                    // Arriving soon - bold green
+                    arrivalTime.style.cssText = 'font-size: 0.75rem; color: #059669; font-weight: 700;';
+                } else {
+                    // Running normally - green
+                    arrivalTime.style.cssText = 'font-size: 0.75rem; color: #059669; font-weight: 500;';
+                }
+            } else {
+                arrivalTime.textContent = line.schedule.weekday.frequency;
+                arrivalTime.style.cssText = 'font-size: 0.75rem; color: #64748b;';
+            }
+
+            lineRow.appendChild(lineInfo);
+            lineRow.appendChild(arrivalTime);
+            linesContainer.appendChild(lineRow);
+        });
+
+        card.appendChild(linesContainer);
+
+        // Click card to zoom to stop on map
+        card.addEventListener('click', () => {
+            state.map.setView([stop.lat, stop.lng], 16);
+
+            // Find and open the stop marker popup
+            const stopMarker = state.stopMarkers.find(m => m.data.name === stop.name);
+            if (stopMarker) {
+                stopMarker.marker.openPopup();
+            }
+
+            // Close sidebar on mobile
+            if (window.innerWidth <= 768) {
+                closeSidebar();
+            }
+        });
+
+        return card;
     }
 
     /**

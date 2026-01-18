@@ -709,6 +709,104 @@ html, body {
     background: var(--bus-color);
 }
 
+/* ================================
+   Stop Search Results
+   ================================ */
+.stop-search-results {
+    padding: 8px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--background);
+    max-height: 40vh;
+    overflow-y: auto;
+}
+
+.stop-search-card {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.stop-search-card:hover {
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-sm);
+}
+
+.stop-search-card:last-child {
+    margin-bottom: 0;
+}
+
+.stop-card-header {
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-primary);
+}
+
+.stop-lines-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.stop-line-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.stop-line-row:last-child {
+    border-bottom: none;
+}
+
+.stop-line-row .line-badge {
+    min-width: 28px;
+    height: 22px;
+    font-size: 0.75rem;
+    padding: 0 6px;
+}
+
+.arrival-time {
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.arrival-time.running {
+    color: var(--bus-color);
+}
+
+.arrival-time.not-running {
+    color: var(--trolleybus-color);
+}
+
+.arrival-time.arriving-soon {
+    color: var(--bus-color);
+    font-weight: 700;
+}
+
+/* Dark mode support for stop search */
+@media (prefers-color-scheme: dark) {
+    .stop-search-results {
+        background: var(--background);
+    }
+
+    .stop-search-card {
+        background: var(--surface);
+        border-color: var(--border-color);
+    }
+
+    .stop-search-card:hover {
+        border-color: var(--primary-color);
+    }
+}
+
 /* Custom marker styles */
 .stop-marker-icon {
     background: var(--primary-color);
