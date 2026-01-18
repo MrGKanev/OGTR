@@ -2,8 +2,7 @@
  * Ruse Transit Map Application
  * Interactive public transit map for Ruse, Bulgaria
  *
- * Note: innerHTML usage is safe here as all content comes from
- * hardcoded transit data, not user input.
+ * Uses normalized data structure with stop IDs for reliable lookups
  */
 
 (function() {
@@ -27,6 +26,7 @@
         linesList: document.getElementById('linesList'),
         lineDetails: document.getElementById('lineDetails'),
         searchInput: document.getElementById('searchInput'),
+        searchClear: document.getElementById('searchClear'),
         filterTabs: document.querySelectorAll('.filter-tab'),
         backBtn: document.getElementById('backBtn'),
         locateBtn: document.getElementById('locateBtn'),
@@ -44,7 +44,7 @@
         trolleybusHover: '#ef4444',
         bus: '#059669',
         busHover: '#10b981',
-        selected: '#facc15',      // Bright yellow for selected line
+        selected: '#facc15',
         selectedWeight: 7,
         stopMajor: '#2563eb',
         stopRegular: '#3b82f6',
@@ -55,7 +55,6 @@
      * Initialize the map
      */
     function initMap() {
-        // Create map centered on Ruse
         state.map = L.map('map', {
             center: TRANSIT_DATA.center,
             zoom: TRANSIT_DATA.defaultZoom,
@@ -63,20 +62,16 @@
             attributionControl: true
         });
 
-        // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(state.map);
 
-        // Position zoom control
         state.map.zoomControl.setPosition('topright');
 
-        // Add routes and stops
         addRoutesToMap();
         addStopsToMap();
 
-        // Hide loading overlay
         setTimeout(() => {
             elements.loadingOverlay.classList.add('hidden');
         }, 500);
@@ -86,7 +81,7 @@
      * Add transit routes to the map
      */
     function addRoutesToMap() {
-        const routesGeoJSON = createRoutesGeoJSON();
+        const routesGeoJSON = TRANSIT_DATA.createRoutesGeoJSON();
 
         routesGeoJSON.features.forEach(feature => {
             const lineId = feature.properties.id;
@@ -104,7 +99,6 @@
                 }
             });
 
-            // Add hover effects
             layer.on('mouseover', function(e) {
                 e.target.setStyle({
                     weight: 6,
@@ -115,14 +109,12 @@
 
             layer.on('mouseout', function(e) {
                 if (state.selectedLine === lineId) {
-                    // Keep selected style (bright yellow)
                     e.target.setStyle({
                         weight: COLORS.selectedWeight,
                         color: COLORS.selected,
                         opacity: 1
                     });
                 } else {
-                    // Reset to normal style
                     e.target.setStyle({
                         weight: 4,
                         color: color,
@@ -131,15 +123,12 @@
                 }
             });
 
-            // Add click handler
             layer.on('click', function() {
                 selectLine(lineId);
             });
 
-            // Add popup
             layer.bindPopup(createRoutePopup(feature.properties));
 
-            // Store layer reference
             state.routeLayers[lineId] = layer;
             layer.addTo(state.map);
         });
@@ -149,13 +138,12 @@
      * Add stop markers to the map
      */
     function addStopsToMap() {
-        const stopsGeoJSON = createStopsGeoJSON();
+        const stopsGeoJSON = TRANSIT_DATA.createStopsGeoJSON();
 
         stopsGeoJSON.features.forEach(feature => {
             const props = feature.properties;
             const coords = feature.geometry.coordinates;
 
-            // Determine marker size based on stop type
             let radius = 6;
             let color = COLORS.stopRegular;
             if (props.type === 'major') {
@@ -175,7 +163,6 @@
                 fillOpacity: 0.9
             });
 
-            // Create popup content
             marker.bindPopup(createStopPopup(props));
 
             marker.addTo(state.map);
@@ -188,7 +175,6 @@
 
     /**
      * Create popup content for a route
-     * Note: Content is from hardcoded data, safe from XSS
      */
     function createRoutePopup(props) {
         const typeLabel = props.type === 'trolleybus' ? 'Тролейбус' : 'Автобус';
@@ -219,7 +205,6 @@
 
     /**
      * Create popup content for a stop with estimated arrival times
-     * Note: Content is from hardcoded data, safe from XSS
      */
     function createStopPopup(props) {
         const container = document.createElement('div');
@@ -240,8 +225,8 @@
 
         props.lines.forEach(lineId => {
             const isTrolley = lineId.startsWith('T');
-            const number = lineId.substring(1);
-            const line = getLineById(lineId);
+            const line = TRANSIT_DATA.getLine(lineId);
+            if (!line) return;
 
             const lineRow = document.createElement('div');
             lineRow.className = 'popup-line-row';
@@ -249,7 +234,7 @@
 
             const badge = document.createElement('span');
             badge.className = 'popup-line-badge ' + (isTrolley ? 'trolleybus' : 'bus');
-            badge.textContent = number;
+            badge.textContent = line.number;
             badge.style.cssText = 'cursor: pointer;';
             badge.title = 'Кликни за детайли';
             badge.addEventListener('click', (e) => {
@@ -261,17 +246,13 @@
             arrivalInfo.className = 'arrival-info';
             arrivalInfo.style.cssText = 'font-size: 0.75rem; color: #059669; font-weight: 500;';
 
-            if (line && typeof calculateEstimatedArrival === 'function') {
-                const arrival = calculateEstimatedArrival(line, props.name);
-                arrivalInfo.textContent = arrival.message;
-                if (!arrival.available) {
-                    arrivalInfo.style.color = '#dc2626';
-                } else if (arrival.minutesUntil <= 3) {
-                    arrivalInfo.style.color = '#059669';
-                    arrivalInfo.style.fontWeight = '700';
-                }
-            } else {
-                arrivalInfo.textContent = line ? line.schedule.weekday.frequency : '';
+            const arrival = TRANSIT_DATA.calculateEstimatedArrival(lineId, props.id);
+            arrivalInfo.textContent = arrival.message;
+            if (!arrival.available) {
+                arrivalInfo.style.color = '#dc2626';
+            } else if (arrival.minutesUntil <= 3) {
+                arrivalInfo.style.color = '#059669';
+                arrivalInfo.style.fontWeight = '700';
             }
 
             lineRow.appendChild(badge);
@@ -288,18 +269,14 @@
 
     /**
      * Populate the lines list in the sidebar
-     * Uses DOM methods for safe element creation
      */
     function populateLinesList() {
-        // Clear existing content
         elements.linesList.textContent = '';
 
-        // Trolleybus section
-        const trolleyGroup = createLineGroup('trolleybus', 'Тролейбуси', TRANSIT_DATA.trolleybusLines);
+        const trolleyGroup = createLineGroup('trolleybus', 'Тролейбуси', TRANSIT_DATA.getTrolleybusLines());
         elements.linesList.appendChild(trolleyGroup);
 
-        // Bus section
-        const busGroup = createLineGroup('bus', 'Автобуси', TRANSIT_DATA.busLines);
+        const busGroup = createLineGroup('bus', 'Автобуси', TRANSIT_DATA.getBusLines());
         elements.linesList.appendChild(busGroup);
     }
 
@@ -354,7 +331,6 @@
         item.appendChild(badge);
         item.appendChild(info);
 
-        // Add click handler
         item.addEventListener('click', () => {
             selectLine(line.id);
         });
@@ -366,9 +342,8 @@
      * Select and highlight a line
      */
     function selectLine(lineId) {
-        // Reset previous selection
         if (state.selectedLine && state.routeLayers[state.selectedLine]) {
-            const prevLine = getLineById(state.selectedLine);
+            const prevLine = TRANSIT_DATA.getLine(state.selectedLine);
             if (prevLine) {
                 const color = prevLine.type === 'trolleybus' ? COLORS.trolleybus : COLORS.bus;
                 state.routeLayers[state.selectedLine].setStyle({
@@ -379,10 +354,8 @@
             }
         }
 
-        // Update state
         state.selectedLine = lineId;
 
-        // Highlight new selection with bright yellow color
         if (state.routeLayers[lineId]) {
             state.routeLayers[lineId].setStyle({
                 weight: COLORS.selectedWeight,
@@ -391,20 +364,16 @@
             });
             state.routeLayers[lineId].bringToFront();
 
-            // Fit map to route bounds
             const bounds = state.routeLayers[lineId].getBounds();
             state.map.fitBounds(bounds, { padding: [50, 50] });
         }
 
-        // Update sidebar
         showLineDetails(lineId);
 
-        // Update active state in list
         elements.linesList.querySelectorAll('.line-item').forEach(item => {
             item.classList.toggle('active', item.dataset.lineId === lineId);
         });
 
-        // On mobile, close sidebar after selection
         if (window.innerWidth <= 768) {
             setTimeout(() => {
                 closeSidebar();
@@ -416,13 +385,12 @@
      * Show line details in sidebar
      */
     function showLineDetails(lineId) {
-        const line = getLineById(lineId);
+        const line = TRANSIT_DATA.getLine(lineId);
         if (!line) return;
 
         const badgeClass = line.type === 'trolleybus' ? 'trolleybus' : 'bus';
         const typeLabel = line.type === 'trolleybus' ? 'Тролейбус' : 'Автобус';
 
-        // Update header
         const detailBadge = document.getElementById('detailBadge');
         detailBadge.textContent = line.number;
         detailBadge.className = 'line-badge ' + badgeClass;
@@ -430,11 +398,12 @@
         document.getElementById('detailName').textContent = line.name;
         document.getElementById('detailType').textContent = typeLabel;
 
-        // Update route stops
         const routeContainer = document.getElementById('detailRoute');
         routeContainer.textContent = '';
 
-        line.stops.forEach(stop => {
+        // Get stops with full data using the new helper
+        const lineStops = TRANSIT_DATA.getLineStops(lineId);
+        lineStops.forEach(stop => {
             const stopEl = document.createElement('div');
             stopEl.className = 'route-stop';
 
@@ -443,19 +412,17 @@
 
             const nameEl = document.createElement('div');
             nameEl.className = 'stop-name';
-            nameEl.textContent = stop;
+            nameEl.textContent = stop.name;
 
             stopEl.appendChild(marker);
             stopEl.appendChild(nameEl);
             routeContainer.appendChild(stopEl);
         });
 
-        // Update schedule
         const scheduleContent = document.querySelector('.schedule-content');
         scheduleContent.textContent = '';
 
         if (line.schedule) {
-            // Weekday row
             const weekdayRow = document.createElement('div');
             weekdayRow.className = 'schedule-row';
             const weekdayLabel = document.createElement('span');
@@ -466,7 +433,6 @@
             weekdayRow.appendChild(weekdayValue);
             scheduleContent.appendChild(weekdayRow);
 
-            // Frequency row
             const freqRow = document.createElement('div');
             freqRow.className = 'schedule-row';
             const freqLabel = document.createElement('span');
@@ -477,7 +443,6 @@
             freqRow.appendChild(freqValue);
             scheduleContent.appendChild(freqRow);
 
-            // Weekend row
             if (line.schedule.weekend.first) {
                 const weekendRow = document.createElement('div');
                 weekendRow.className = 'schedule-row';
@@ -489,25 +454,8 @@
                 weekendRow.appendChild(weekendValue);
                 scheduleContent.appendChild(weekendRow);
             }
-
-            // Departures (if available)
-            if (line.schedule.weekday.departures) {
-                const depsDiv = document.createElement('div');
-                depsDiv.className = 'schedule-departures';
-                depsDiv.style.marginTop = '8px';
-                depsDiv.style.fontSize = '0.75rem';
-
-                const depsLabel = document.createElement('strong');
-                depsLabel.textContent = 'Тръгвания:';
-                depsDiv.appendChild(depsLabel);
-                depsDiv.appendChild(document.createElement('br'));
-                depsDiv.appendChild(document.createTextNode(line.schedule.weekday.departures));
-
-                scheduleContent.appendChild(depsDiv);
-            }
         }
 
-        // Show details panel, hide list
         elements.lineDetails.classList.add('active');
         elements.linesList.classList.add('hidden');
     }
@@ -519,9 +467,8 @@
         elements.lineDetails.classList.remove('active');
         elements.linesList.classList.remove('hidden');
 
-        // Reset line highlight
         if (state.selectedLine && state.routeLayers[state.selectedLine]) {
-            const line = getLineById(state.selectedLine);
+            const line = TRANSIT_DATA.getLine(state.selectedLine);
             if (line) {
                 const color = line.type === 'trolleybus' ? COLORS.trolleybus : COLORS.bus;
                 state.routeLayers[state.selectedLine].setStyle({
@@ -533,18 +480,9 @@
         }
         state.selectedLine = null;
 
-        // Remove active state from list items
         elements.linesList.querySelectorAll('.line-item').forEach(item => {
             item.classList.remove('active');
         });
-    }
-
-    /**
-     * Get line data by ID
-     */
-    function getLineById(lineId) {
-        const allLines = [...TRANSIT_DATA.trolleybusLines, ...TRANSIT_DATA.busLines];
-        return allLines.find(line => line.id === lineId);
     }
 
     /**
@@ -553,12 +491,10 @@
     function filterLines(filterType) {
         state.activeFilter = filterType;
 
-        // Update filter tabs
         elements.filterTabs.forEach(tab => {
             tab.classList.toggle('active', tab.dataset.filter === filterType);
         });
 
-        // Filter line items
         elements.linesList.querySelectorAll('.line-group').forEach(group => {
             const groupType = group.dataset.type;
             if (filterType === 'all') {
@@ -568,10 +504,9 @@
             }
         });
 
-        // Filter map layers
         Object.keys(state.routeLayers).forEach(lineId => {
             const layer = state.routeLayers[lineId];
-            const line = getLineById(lineId);
+            const line = TRANSIT_DATA.getLine(lineId);
             if (line) {
                 if (filterType === 'all' || line.type === filterType) {
                     layer.addTo(state.map);
@@ -588,7 +523,6 @@
     function searchLines(query) {
         const normalizedQuery = query.toLowerCase().trim();
 
-        // Get or create stop results container
         let stopResultsContainer = document.getElementById('stopSearchResults');
         if (!stopResultsContainer) {
             stopResultsContainer = document.createElement('div');
@@ -597,12 +531,10 @@
             elements.linesList.parentNode.insertBefore(stopResultsContainer, elements.linesList);
         }
 
-        // Clear previous stop results
         stopResultsContainer.textContent = '';
         stopResultsContainer.style.display = 'none';
 
         if (normalizedQuery === '') {
-            // Show all lines when query is empty
             elements.linesList.querySelectorAll('.line-item').forEach(item => {
                 item.style.display = 'flex';
             });
@@ -612,12 +544,9 @@
             return;
         }
 
-        // Search for matching stops
-        const matchingStops = STOP_MARKERS.filter(stop =>
-            stop.name.toLowerCase().includes(normalizedQuery)
-        );
+        // Use the new searchStops function which also searches aliases
+        const matchingStops = TRANSIT_DATA.searchStops(normalizedQuery);
 
-        // If stops found, display them with bus info and arrival times
         if (matchingStops.length > 0) {
             stopResultsContainer.style.display = 'block';
 
@@ -633,21 +562,23 @@
             });
         }
 
-        // Also filter lines as before
+        // Also filter lines
         elements.linesList.querySelectorAll('.line-item').forEach(item => {
             const lineId = item.dataset.lineId;
-            const line = getLineById(lineId);
+            const line = TRANSIT_DATA.getLine(lineId);
 
             const matchesNumber = line.number.includes(normalizedQuery);
             const matchesRoute = line.route.toLowerCase().includes(normalizedQuery);
-            const matchesStops = line.stops.some(stop =>
-                stop.toLowerCase().includes(normalizedQuery)
+
+            // Check if any stop name matches
+            const lineStops = TRANSIT_DATA.getLineStops(lineId);
+            const matchesStops = lineStops.some(stop =>
+                stop.name.toLowerCase().includes(normalizedQuery)
             );
 
             item.style.display = (matchesNumber || matchesRoute || matchesStops) ? 'flex' : 'none';
         });
 
-        // Show/hide group titles based on visible items
         elements.linesList.querySelectorAll('.line-group').forEach(group => {
             const visibleItems = group.querySelectorAll('.line-item[style*="flex"]').length;
             const hiddenItems = group.querySelectorAll('.line-item[style*="none"]').length;
@@ -657,20 +588,19 @@
     }
 
     /**
-     * Create a stop search result card showing buses and arrival times
+     * Create a stop search result card
      */
     function createStopSearchResult(stop) {
         const card = document.createElement('div');
         card.className = 'stop-search-card';
         card.style.cssText = 'background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 8px; cursor: pointer;';
 
-        // Stop name header
         const header = document.createElement('div');
         header.className = 'stop-card-header';
         header.style.cssText = 'font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;';
 
         const icon = document.createElement('span');
-        icon.textContent = '📍';
+        icon.textContent = '\ud83d\udccd';
         header.appendChild(icon);
 
         const nameSpan = document.createElement('span');
@@ -679,13 +609,12 @@
 
         card.appendChild(header);
 
-        // Lines serving this stop with arrival times
         const linesContainer = document.createElement('div');
         linesContainer.className = 'stop-lines-container';
         linesContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px;';
 
         stop.lines.forEach(lineId => {
-            const line = getLineById(lineId);
+            const line = TRANSIT_DATA.getLine(lineId);
             if (!line) return;
 
             const isTrolley = lineId.startsWith('T');
@@ -693,7 +622,6 @@
             lineRow.className = 'stop-line-row';
             lineRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 4px 0;';
 
-            // Line badge and info
             const lineInfo = document.createElement('div');
             lineInfo.style.cssText = 'display: flex; align-items: center; gap: 8px;';
 
@@ -713,27 +641,18 @@
             lineInfo.appendChild(badge);
             lineInfo.appendChild(routeName);
 
-            // Arrival time estimation
             const arrivalTime = document.createElement('span');
             arrivalTime.className = 'arrival-time';
 
-            if (typeof calculateEstimatedArrival === 'function') {
-                const arrival = calculateEstimatedArrival(line, stop.name);
-                arrivalTime.textContent = arrival.message;
+            const arrival = TRANSIT_DATA.calculateEstimatedArrival(lineId, stop.id);
+            arrivalTime.textContent = arrival.message;
 
-                if (!arrival.available) {
-                    // Not running - red color
-                    arrivalTime.style.cssText = 'font-size: 0.75rem; color: #dc2626; font-weight: 500;';
-                } else if (arrival.minutesUntil <= 3) {
-                    // Arriving soon - bold green
-                    arrivalTime.style.cssText = 'font-size: 0.75rem; color: #059669; font-weight: 700;';
-                } else {
-                    // Running normally - green
-                    arrivalTime.style.cssText = 'font-size: 0.75rem; color: #059669; font-weight: 500;';
-                }
+            if (!arrival.available) {
+                arrivalTime.style.cssText = 'font-size: 0.75rem; color: #dc2626; font-weight: 500;';
+            } else if (arrival.minutesUntil <= 3) {
+                arrivalTime.style.cssText = 'font-size: 0.75rem; color: #059669; font-weight: 700;';
             } else {
-                arrivalTime.textContent = line.schedule.weekday.frequency;
-                arrivalTime.style.cssText = 'font-size: 0.75rem; color: #64748b;';
+                arrivalTime.style.cssText = 'font-size: 0.75rem; color: #059669; font-weight: 500;';
             }
 
             lineRow.appendChild(lineInfo);
@@ -743,17 +662,14 @@
 
         card.appendChild(linesContainer);
 
-        // Click card to zoom to stop on map
         card.addEventListener('click', () => {
             state.map.setView([stop.lat, stop.lng], 16);
 
-            // Find and open the stop marker popup
-            const stopMarker = state.stopMarkers.find(m => m.data.name === stop.name);
+            const stopMarker = state.stopMarkers.find(m => m.data.id === stop.id);
             if (stopMarker) {
                 stopMarker.marker.openPopup();
             }
 
-            // Close sidebar on mobile
             if (window.innerWidth <= 768) {
                 closeSidebar();
             }
@@ -790,7 +706,6 @@
                     const { latitude, longitude } = position.coords;
                     state.map.setView([latitude, longitude], 16);
 
-                    // Add user marker
                     const markerIcon = L.divIcon({
                         className: 'user-location-marker',
                         html: '<div style="width: 16px; height: 16px; background: #2563eb; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>',
@@ -821,6 +736,7 @@
         hideLineDetails();
         filterLines('all');
         elements.searchInput.value = '';
+        elements.searchClear.classList.remove('visible');
         searchLines('');
     }
 
@@ -831,54 +747,53 @@
         elements.mapLegend.classList.toggle('expanded');
         const btn = elements.legendToggle;
         btn.textContent = elements.mapLegend.classList.contains('expanded')
-            ? 'Легенда ▲'
-            : 'Легенда ▼';
+            ? 'Легенда \u25b2'
+            : 'Легенда \u25bc';
     }
 
     /**
      * Initialize event listeners
      */
     function initEventListeners() {
-        // Menu toggle
         elements.menuToggle.addEventListener('click', toggleSidebar);
 
-        // Filter tabs
         elements.filterTabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 filterLines(tab.dataset.filter);
             });
         });
 
-        // Search input
         elements.searchInput.addEventListener('input', (e) => {
             searchLines(e.target.value);
+            elements.searchClear.classList.toggle('visible', e.target.value.length > 0);
         });
 
-        // Back button
+        elements.searchClear.addEventListener('click', () => {
+            elements.searchInput.value = '';
+            searchLines('');
+            elements.searchClear.classList.remove('visible');
+            elements.searchInput.focus();
+        });
+
         elements.backBtn.addEventListener('click', hideLineDetails);
 
-        // Map controls
         elements.locateBtn.addEventListener('click', locateUser);
         elements.resetBtn.addEventListener('click', resetMapView);
 
-        // Legend toggle
         elements.legendToggle.addEventListener('click', toggleLegend);
 
-        // Modal close
         if (elements.modalClose) {
             elements.modalClose.addEventListener('click', () => {
                 elements.infoModal.classList.remove('active');
             });
         }
 
-        // Close sidebar when clicking outside on mobile
         elements.map.addEventListener('click', () => {
             if (window.innerWidth <= 768 && state.sidebarOpen) {
                 closeSidebar();
             }
         });
 
-        // Handle window resize
         window.addEventListener('resize', () => {
             if (window.innerWidth > 768) {
                 closeSidebar();
@@ -886,7 +801,6 @@
             state.map.invalidateSize();
         });
 
-        // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 if (elements.infoModal.classList.contains('active')) {
@@ -906,25 +820,29 @@
     function init() {
         console.log('Initializing Ruse Transit Map...');
 
-        // Check for required data
         if (typeof TRANSIT_DATA === 'undefined') {
             console.error('Transit data not loaded');
             return;
         }
 
-        // Initialize map
+        // Run validation in development
+        const validation = TRANSIT_DATA.validateData();
+        if (!validation.valid) {
+            console.error('Data validation errors:', validation.errors);
+        }
+        if (validation.warnings.length > 0) {
+            console.warn('Data validation warnings:', validation.warnings);
+        }
+
         initMap();
-
-        // Populate sidebar
         populateLinesList();
-
-        // Set up event listeners
         initEventListeners();
 
         console.log('Ruse Transit Map initialized successfully');
+        console.log('Stops:', Object.keys(TRANSIT_DATA.STOPS).length);
+        console.log('Lines:', Object.keys(TRANSIT_DATA.LINES).length);
     }
 
-    // Start application when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
