@@ -208,30 +208,69 @@
     }
 
     /**
-     * Create popup content for a stop
+     * Create popup content for a stop with estimated arrival times
      * Note: Content is from hardcoded data, safe from XSS
      */
     function createStopPopup(props) {
         const container = document.createElement('div');
-        container.className = 'popup-content';
+        container.className = 'popup-content stop-popup';
 
         const title = document.createElement('div');
         title.className = 'popup-title';
         title.textContent = props.name;
 
+        const subtitle = document.createElement('div');
+        subtitle.className = 'popup-subtitle';
+        subtitle.textContent = 'Линии и ориентировъчно време:';
+        subtitle.style.cssText = 'font-size: 0.75rem; color: #64748b; margin: 4px 0 8px;';
+
         const linesDiv = document.createElement('div');
-        linesDiv.className = 'popup-lines';
+        linesDiv.className = 'popup-lines-arrivals';
+        linesDiv.style.cssText = 'display: flex; flex-direction: column; gap: 6px;';
 
         props.lines.forEach(lineId => {
             const isTrolley = lineId.startsWith('T');
             const number = lineId.substring(1);
+            const line = getLineById(lineId);
+
+            const lineRow = document.createElement('div');
+            lineRow.className = 'popup-line-row';
+            lineRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px;';
+
             const badge = document.createElement('span');
             badge.className = 'popup-line-badge ' + (isTrolley ? 'trolleybus' : 'bus');
             badge.textContent = number;
-            linesDiv.appendChild(badge);
+            badge.style.cssText = 'cursor: pointer;';
+            badge.title = 'Кликни за детайли';
+            badge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectLine(lineId);
+            });
+
+            const arrivalInfo = document.createElement('span');
+            arrivalInfo.className = 'arrival-info';
+            arrivalInfo.style.cssText = 'font-size: 0.75rem; color: #059669; font-weight: 500;';
+
+            if (line && typeof calculateEstimatedArrival === 'function') {
+                const arrival = calculateEstimatedArrival(line, props.name);
+                arrivalInfo.textContent = arrival.message;
+                if (!arrival.available) {
+                    arrivalInfo.style.color = '#dc2626';
+                } else if (arrival.minutesUntil <= 3) {
+                    arrivalInfo.style.color = '#059669';
+                    arrivalInfo.style.fontWeight = '700';
+                }
+            } else {
+                arrivalInfo.textContent = line ? line.schedule.weekday.frequency : '';
+            }
+
+            lineRow.appendChild(badge);
+            lineRow.appendChild(arrivalInfo);
+            linesDiv.appendChild(lineRow);
         });
 
         container.appendChild(title);
+        container.appendChild(subtitle);
         container.appendChild(linesDiv);
 
         return container;
