@@ -1,0 +1,840 @@
+/* ================================
+   CSS Variables & Base Styles
+   ================================ */
+:root {
+    --primary-color: #2563eb;
+    --primary-dark: #1d4ed8;
+    --trolleybus-color: #dc2626;
+    --bus-color: #059669;
+    --background: #f8fafc;
+    --surface: #ffffff;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --border-color: #e2e8f0;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --header-height: 56px;
+    --sidebar-width: 320px;
+    --transition: 0.2s ease;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    background: var(--background);
+    overflow: hidden;
+}
+
+/* ================================
+   Header
+   ================================ */
+.header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--header-height);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    z-index: 1000;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 100%;
+    padding: 0 16px;
+    max-width: 100%;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.logo-icon {
+    font-size: 1.5rem;
+}
+
+.menu-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: space-around;
+    width: 28px;
+    height: 24px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+}
+
+.menu-toggle span {
+    display: block;
+    width: 100%;
+    height: 3px;
+    background: var(--text-primary);
+    border-radius: 2px;
+    transition: var(--transition);
+}
+
+.menu-toggle.active span:nth-child(1) {
+    transform: rotate(45deg) translate(5px, 5px);
+}
+
+.menu-toggle.active span:nth-child(2) {
+    opacity: 0;
+}
+
+.menu-toggle.active span:nth-child(3) {
+    transform: rotate(-45deg) translate(7px, -6px);
+}
+
+/* ================================
+   Main Content Layout
+   ================================ */
+.main-content {
+    display: flex;
+    height: calc(100vh - var(--header-height));
+    margin-top: var(--header-height);
+}
+
+/* ================================
+   Sidebar
+   ================================ */
+.sidebar {
+    width: var(--sidebar-width);
+    height: 100%;
+    background: var(--surface);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: transform var(--transition);
+    z-index: 500;
+}
+
+.sidebar-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-header h2 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.filter-tabs {
+    display: flex;
+    gap: 8px;
+}
+
+.filter-tab {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    background: var(--surface);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.filter-tab:hover {
+    background: var(--background);
+}
+
+.filter-tab.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+.search-box {
+    position: relative;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.search-box input {
+    width: 100%;
+    padding: 10px 12px 10px 36px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 0.9375rem;
+    background: var(--background);
+    transition: var(--transition);
+}
+
+.search-box input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.1);
+}
+
+.search-icon {
+    position: absolute;
+    left: 26px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.875rem;
+    pointer-events: none;
+}
+
+/* ================================
+   Lines List
+   ================================ */
+.lines-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.line-group {
+    margin-bottom: 16px;
+}
+
+.line-group-title {
+    padding: 8px 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.line-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.line-item:hover {
+    background: var(--background);
+}
+
+.line-item.active {
+    background: rgb(37 99 235 / 0.1);
+}
+
+.line-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 32px;
+    padding: 0 8px;
+    border-radius: var(--radius-sm);
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: white;
+}
+
+.line-badge.trolleybus {
+    background: var(--trolleybus-color);
+}
+
+.line-badge.bus {
+    background: var(--bus-color);
+}
+
+.line-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.line-item-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.line-item-route {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ================================
+   Line Details Panel
+   ================================ */
+.line-details {
+    display: none;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.line-details.active {
+    display: flex;
+}
+
+.lines-list-wrapper.hidden {
+    display: none;
+}
+
+.back-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 16px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.9375rem;
+    color: var(--primary-color);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.back-btn:hover {
+    background: var(--background);
+}
+
+.line-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.line-header .line-badge {
+    min-width: 48px;
+    height: 40px;
+    font-size: 1.125rem;
+}
+
+.line-info h3 {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.line-type {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.line-route {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.route-stop {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    position: relative;
+    padding-bottom: 16px;
+}
+
+.route-stop:last-child {
+    padding-bottom: 0;
+}
+
+.route-stop:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 20px;
+    bottom: 0;
+    width: 2px;
+    background: var(--border-color);
+}
+
+.stop-marker {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 3px solid var(--primary-color);
+    background: white;
+    flex-shrink: 0;
+    z-index: 1;
+}
+
+.route-stop:first-child .stop-marker,
+.route-stop:last-child .stop-marker {
+    background: var(--primary-color);
+}
+
+.stop-name {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+}
+
+.line-schedule {
+    padding: 16px;
+    border-top: 1px solid var(--border-color);
+    background: var(--background);
+}
+
+.line-schedule h4 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.schedule-content {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+}
+
+.schedule-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+}
+
+.schedule-row span:first-child {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+/* ================================
+   Map Container
+   ================================ */
+.map-container {
+    flex: 1;
+    position: relative;
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+}
+
+/* ================================
+   Map Controls
+   ================================ */
+.map-controls {
+    position: absolute;
+    right: 16px;
+    top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 400;
+}
+
+.map-control-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface);
+    border: none;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    font-size: 1.125rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.map-control-btn:hover {
+    background: var(--background);
+    transform: scale(1.05);
+}
+
+/* ================================
+   Map Legend
+   ================================ */
+.map-legend {
+    position: absolute;
+    left: 16px;
+    bottom: 24px;
+    background: var(--surface);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    z-index: 400;
+    overflow: hidden;
+}
+
+.legend-toggle {
+    display: none;
+    width: 100%;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+}
+
+.legend-content {
+    padding: 12px 16px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+}
+
+.legend-line {
+    width: 24px;
+    height: 4px;
+    border-radius: 2px;
+}
+
+.legend-line.trolleybus-line {
+    background: var(--trolleybus-color);
+}
+
+.legend-line.bus-line {
+    background: var(--bus-color);
+}
+
+.legend-stop {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px var(--primary-color);
+}
+
+/* ================================
+   Modal
+   ================================ */
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgb(0 0 0 / 0.5);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    position: relative;
+    max-width: 500px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: var(--shadow-lg);
+}
+
+.modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--background);
+    border: none;
+    border-radius: 50%;
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.modal-close:hover {
+    background: var(--border-color);
+}
+
+.modal-content h2 {
+    font-size: 1.25rem;
+    margin-bottom: 16px;
+}
+
+.modal-content h3 {
+    font-size: 1rem;
+    margin: 16px 0 8px;
+}
+
+.modal-content p {
+    font-size: 0.9375rem;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.modal-content ul {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.modal-content li {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.modal-content a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+.modal-content a:hover {
+    text-decoration: underline;
+}
+
+.disclaimer {
+    padding: 12px;
+    background: rgb(251 191 36 / 0.1);
+    border-radius: var(--radius-md);
+    border-left: 3px solid #f59e0b;
+    font-size: 0.8125rem !important;
+}
+
+/* ================================
+   Loading Overlay
+   ================================ */
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 3000;
+    transition: opacity 0.3s ease;
+}
+
+.loading-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-overlay p {
+    font-size: 0.9375rem;
+    color: var(--text-secondary);
+}
+
+/* ================================
+   Leaflet Customizations
+   ================================ */
+.leaflet-popup-content-wrapper {
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+}
+
+.leaflet-popup-content {
+    margin: 12px 16px;
+    font-size: 0.875rem;
+}
+
+.popup-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.popup-lines {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.popup-line-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: white;
+}
+
+.popup-line-badge.trolleybus {
+    background: var(--trolleybus-color);
+}
+
+.popup-line-badge.bus {
+    background: var(--bus-color);
+}
+
+/* Custom marker styles */
+.stop-marker-icon {
+    background: var(--primary-color);
+    border: 2px solid white;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgb(0 0 0 / 0.2);
+}
+
+/* ================================
+   Mobile Responsive
+   ================================ */
+@media (max-width: 768px) {
+    :root {
+        --sidebar-width: 100%;
+    }
+
+    .menu-toggle {
+        display: flex;
+    }
+
+    .sidebar {
+        position: fixed;
+        top: var(--header-height);
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        transform: translateX(-100%);
+        border-right: none;
+        box-shadow: var(--shadow-lg);
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .map-container {
+        width: 100%;
+    }
+
+    .map-controls {
+        right: 12px;
+        top: 12px;
+    }
+
+    .map-legend {
+        left: 12px;
+        bottom: 20px;
+        max-width: calc(100% - 80px);
+    }
+
+    .legend-toggle {
+        display: block;
+    }
+
+    .legend-content {
+        display: none;
+        padding-top: 0;
+    }
+
+    .map-legend.expanded .legend-content {
+        display: block;
+    }
+
+    .modal-content {
+        padding: 20px;
+        max-height: 80vh;
+    }
+}
+
+@media (max-width: 480px) {
+    .header-content {
+        padding: 0 12px;
+    }
+
+    .logo {
+        font-size: 1.125rem;
+    }
+
+    .filter-tabs {
+        flex-wrap: wrap;
+    }
+
+    .filter-tab {
+        flex: none;
+        padding: 6px 10px;
+        font-size: 0.8125rem;
+    }
+}
+
+/* ================================
+   Dark Mode Support (optional)
+   ================================ */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --background: #0f172a;
+        --surface: #1e293b;
+        --text-primary: #f1f5f9;
+        --text-secondary: #94a3b8;
+        --border-color: #334155;
+    }
+
+    .search-box input {
+        color: var(--text-primary);
+    }
+
+    .loading-overlay {
+        background: var(--surface);
+    }
+}
+
+/* Print styles */
+@media print {
+    .header,
+    .sidebar,
+    .map-controls,
+    .map-legend {
+        display: none !important;
+    }
+
+    .main-content {
+        margin-top: 0;
+        height: auto;
+    }
+
+    .map-container {
+        width: 100%;
+        height: 100vh;
+    }
+}

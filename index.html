@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Градски транспорт Русе | Интерактивна карта</title>
+    <meta name="description" content="Интерактивна карта на градския транспорт в Русе - автобусни и тролейбусни линии, спирки и разписания.">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin="">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚌</text></svg>">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <h1 class="logo">
+                <span class="logo-icon">🚍</span>
+                <span class="logo-text">Транспорт Русе</span>
+            </h1>
+            <button class="menu-toggle" aria-label="Меню" id="menuToggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>Линии</h2>
+                <div class="filter-tabs">
+                    <button class="filter-tab active" data-filter="all">Всички</button>
+                    <button class="filter-tab" data-filter="trolleybus">Тролейбуси</button>
+                    <button class="filter-tab" data-filter="bus">Автобуси</button>
+                </div>
+            </div>
+
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Търси линия или спирка..." aria-label="Търсене">
+                <span class="search-icon">🔍</span>
+            </div>
+
+            <div class="lines-list" id="linesList">
+                <!-- Lines will be populated by JavaScript -->
+            </div>
+
+            <!-- Line Details Panel -->
+            <div class="line-details" id="lineDetails">
+                <button class="back-btn" id="backBtn">← Назад</button>
+                <div class="line-header">
+                    <span class="line-badge" id="detailBadge">21</span>
+                    <div class="line-info">
+                        <h3 id="detailName">Линия 21</h3>
+                        <span class="line-type" id="detailType">Тролейбус</span>
+                    </div>
+                </div>
+                <div class="line-route" id="detailRoute">
+                    <!-- Route stops will be populated -->
+                </div>
+                <div class="line-schedule" id="detailSchedule">
+                    <h4>Разписание</h4>
+                    <div class="schedule-content">
+                        <!-- Schedule will be populated -->
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Map Container -->
+        <div class="map-container">
+            <div id="map"></div>
+
+            <!-- Map Controls -->
+            <div class="map-controls">
+                <button class="map-control-btn" id="locateBtn" title="Моята локация">
+                    📍
+                </button>
+                <button class="map-control-btn" id="resetBtn" title="Покажи целия град">
+                    🔄
+                </button>
+            </div>
+
+            <!-- Legend -->
+            <div class="map-legend" id="mapLegend">
+                <button class="legend-toggle" id="legendToggle">Легенда ▼</button>
+                <div class="legend-content">
+                    <div class="legend-item">
+                        <span class="legend-line trolleybus-line"></span>
+                        <span>Тролейбус</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-line bus-line"></span>
+                        <span>Автобус</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-stop"></span>
+                        <span>Спирка</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Info Modal -->
+    <div class="modal" id="infoModal">
+        <div class="modal-content">
+            <button class="modal-close" id="modalClose">&times;</button>
+            <h2>За проекта</h2>
+            <p>Тази интерактивна карта е отворен проект (open source) за визуализация на градския транспорт в Русе.</p>
+            <h3>Данни</h3>
+            <p>Информацията за линиите и разписанията е събрана от публични източници:</p>
+            <ul>
+                <li><a href="https://transport.obshtinaruse.bg" target="_blank">Община Русе - Транспорт</a></li>
+                <li><a href="https://www.transport-ruse.com/" target="_blank">Общински Транспорт Русе</a></li>
+                <li><a href="https://gtruse.wixsite.com/gtruse" target="_blank">Градски транспорт Русе</a></li>
+            </ul>
+            <h3>Технологии</h3>
+            <p>Картата използва <a href="https://leafletjs.com" target="_blank">Leaflet.js</a> и <a href="https://www.openstreetmap.org" target="_blank">OpenStreetMap</a>.</p>
+            <p class="disclaimer">Забележка: Маршрутите са приблизителни. За точни разписания проверете официалните източници.</p>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <p>Зареждане на картата...</p>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+
+    <!-- Application Scripts -->
+    <script src="js/data.js"></script>
+    <script src="js/routes.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
