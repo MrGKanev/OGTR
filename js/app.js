@@ -44,6 +44,8 @@
         trolleybusHover: '#ef4444',
         bus: '#059669',
         busHover: '#10b981',
+        selected: '#facc15',      // Bright yellow for selected line
+        selectedWeight: 7,
         stopMajor: '#2563eb',
         stopRegular: '#3b82f6',
         stopTerminal: '#1d4ed8'
@@ -112,7 +114,15 @@
             });
 
             layer.on('mouseout', function(e) {
-                if (state.selectedLine !== lineId) {
+                if (state.selectedLine === lineId) {
+                    // Keep selected style (bright yellow)
+                    e.target.setStyle({
+                        weight: COLORS.selectedWeight,
+                        color: COLORS.selected,
+                        opacity: 1
+                    });
+                } else {
+                    // Reset to normal style
                     e.target.setStyle({
                         weight: 4,
                         color: color,
@@ -372,13 +382,11 @@
         // Update state
         state.selectedLine = lineId;
 
-        // Highlight new selection
+        // Highlight new selection with bright yellow color
         if (state.routeLayers[lineId]) {
-            const line = getLineById(lineId);
-            const hoverColor = line.type === 'trolleybus' ? COLORS.trolleybusHover : COLORS.busHover;
             state.routeLayers[lineId].setStyle({
-                weight: 6,
-                color: hoverColor,
+                weight: COLORS.selectedWeight,
+                color: COLORS.selected,
                 opacity: 1
             });
             state.routeLayers[lineId].bringToFront();

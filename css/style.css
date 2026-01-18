@@ -440,7 +440,7 @@ html, body {
 .map-controls {
     position: absolute;
     right: 16px;
-    top: 16px;
+    bottom: 24px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -750,7 +750,7 @@ html, body {
 
     .map-controls {
         right: 12px;
-        top: 12px;
+        bottom: 80px;
     }
 
     .map-legend {
