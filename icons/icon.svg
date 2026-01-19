@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#2563eb"/>
+  <g fill="#fff">
+    <!-- Bus body -->
+    <rect x="96" y="160" width="320" height="200" rx="24"/>
+    <!-- Windows -->
+    <rect x="120" y="184" width="80" height="72" rx="8" fill="#2563eb"/>
+    <rect x="216" y="184" width="80" height="72" rx="8" fill="#2563eb"/>
+    <rect x="312" y="184" width="80" height="72" rx="8" fill="#2563eb"/>
+    <!-- Wheels -->
+    <circle cx="160" cy="360" r="40"/>
+    <circle cx="352" cy="360" r="40"/>
+    <circle cx="160" cy="360" r="20" fill="#2563eb"/>
+    <circle cx="352" cy="360" r="20" fill="#2563eb"/>
+    <!-- Headlights -->
+    <rect x="384" y="280" width="24" height="40" rx="4" fill="#fbbf24"/>
+    <rect x="104" y="280" width="24" height="40" rx="4" fill="#fbbf24"/>
+    <!-- Trolley poles -->
+    <path d="M200 160 L180 80 L190 80 L210 160" fill="#fff"/>
+    <path d="M312 160 L332 80 L322 80 L302 160" fill="#fff"/>
+  </g>
+</svg>

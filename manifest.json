@@ -1,0 +1,41 @@
+{
+  "name": "Транспорт Русе",
+  "short_name": "Транспорт",
+  "description": "Интерактивна карта на градския транспорт в Русе - автобуси и тролейбуси",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "orientation": "any",
+  "scope": "./",
+  "lang": "bg",
+  "categories": ["navigation", "transportation"],
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Тролейбуси",
+      "short_name": "Тролейбуси",
+      "description": "Виж тролейбусните линии",
+      "url": "./index.html?filter=trolleybus"
+    },
+    {
+      "name": "Автобуси",
+      "short_name": "Автобуси",
+      "description": "Виж автобусните линии",
+      "url": "./index.html?filter=bus"
+    }
+  ]
+}
