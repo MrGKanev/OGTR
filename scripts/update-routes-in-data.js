@@ -13,7 +13,7 @@ const dataPath = path.join(__dirname, '..', 'js', 'data-normalized.js');
 let content = fs.readFileSync(dataPath, 'utf8');
 
 // Find the ROUTE_GEOMETRIES section
-const startMarker = '// ═══════════════════════════════════════════════════════════════\n// ROUTE GEOMETRIES (GeoJSON LineStrings)\n// ═══════════════════════════════════════════════════════════════\nconst ROUTE_GEOMETRIES = {';
+const startMarker = '// ═══════════════════════════════════════════════════════════════\n// ROUTE GEOMETRIES (GeoJSON LineStrings) - Generated from OSRM\n// ═══════════════════════════════════════════════════════════════\nconst ROUTE_GEOMETRIES = {';
 const endMarker = '\n// ═══════════════════════════════════════════════════════════════\n// HELPER FUNCTIONS';
 
 const startIdx = content.indexOf(startMarker);
