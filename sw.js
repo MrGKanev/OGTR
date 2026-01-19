@@ -2,7 +2,7 @@
  * Service Worker for Транспорт Русе PWA
  */
 
-const CACHE_NAME = 'transport-ruse-v2';
+const CACHE_NAME = 'transport-ruse-v3';
 const STATIC_ASSETS = [
     './',
     './index.html',

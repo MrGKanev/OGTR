@@ -17,8 +17,6 @@
 
 - [Leaflet.js](https://leafletjs.com/) - Библиотека за интерактивни карти
 - [OpenStreetMap](https://www.openstreetmap.org/) - Отворени картографски данни
-- Чист HTML/CSS/JavaScript (без frameworks)
-- GitHub Pages за хостинг
 
 ## Структура на проекта
 

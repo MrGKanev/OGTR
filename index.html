@@ -101,24 +101,70 @@
                 <span class="logo-icon">🚍</span>
                 <span class="logo-text">Транспорт Русе</span>
             </h1>
-            <button class="menu-toggle" aria-label="Меню" id="menuToggle">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
+            <div class="header-actions">
+                <button class="header-btn" id="darkModeToggle" aria-label="Тъмен режим" title="Тъмен режим (D)">
+                    <span class="icon-light">🌙</span>
+                    <span class="icon-dark">☀️</span>
+                </button>
+                <button class="menu-toggle" aria-label="Меню" id="menuToggle">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
         </div>
     </header>
+
+    <!-- Offline Indicator -->
+    <div class="offline-indicator" id="offlineIndicator">
+        <span>📡</span> Офлайн режим
+    </div>
+
+    <!-- PWA Install Prompt -->
+    <div class="install-prompt" id="installPrompt">
+        <div class="install-prompt-content">
+            <span class="install-icon">📲</span>
+            <div class="install-text">
+                <strong>Инсталирай приложението</strong>
+                <span>За бърз достъп от началния екран</span>
+            </div>
+            <button class="install-btn" id="installBtn">Инсталирай</button>
+            <button class="install-close" id="installClose" aria-label="Затвори">×</button>
+        </div>
+    </div>
 
     <!-- Main Content -->
     <main class="main-content">
         <!-- Sidebar -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h2>Линии</h2>
+                <div class="sidebar-title-row">
+                    <h2>Линии</h2>
+                    <div class="sidebar-actions">
+                        <button class="sidebar-action-btn" id="nearbyBtn" title="Най-близки спирки (N)">
+                            <span>📍</span>
+                        </button>
+                        <button class="sidebar-action-btn" id="favoritesBtn" title="Любими (F)">
+                            <span>⭐</span>
+                        </button>
+                    </div>
+                </div>
                 <div class="filter-tabs">
                     <button class="filter-tab active" data-filter="all">Всички</button>
                     <button class="filter-tab" data-filter="trolleybus">Тролейбуси</button>
                     <button class="filter-tab" data-filter="bus">Автобуси</button>
+                    <button class="filter-tab" data-filter="favorites">⭐</button>
+                </div>
+            </div>
+
+            <!-- Nearby Stops Panel -->
+            <div class="nearby-panel" id="nearbyPanel">
+                <div class="nearby-header">
+                    <h3>📍 Най-близки спирки</h3>
+                    <button class="nearby-close" id="nearbyClose">×</button>
+                </div>
+                <div class="nearby-content" id="nearbyContent">
+                    <p class="nearby-loading">Определяне на локация...</p>
                 </div>
             </div>
 
@@ -134,7 +180,21 @@
 
             <!-- Line Details Panel -->
             <div class="line-details" id="lineDetails">
-                <button class="back-btn" id="backBtn">← Назад</button>
+                <div class="details-top-bar">
+                    <button class="back-btn" id="backBtn">← Назад</button>
+                    <div class="details-actions">
+                        <button class="detail-action-btn" id="favoriteLineBtn" title="Добави в любими">
+                            <span class="fav-icon-empty">☆</span>
+                            <span class="fav-icon-full">★</span>
+                        </button>
+                        <button class="detail-action-btn" id="exportScheduleBtn" title="Принтирай разписание">
+                            <span>🖨️</span>
+                        </button>
+                        <button class="detail-action-btn" id="shareLineBtn" title="Сподели линия">
+                            <span>🔗</span>
+                        </button>
+                    </div>
+                </div>
                 <div class="line-header">
                     <span class="line-badge" id="detailBadge">21</span>
                     <div class="line-info">
@@ -212,6 +272,24 @@
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner"></div>
         <p>Зареждане на картата...</p>
+    </div>
+
+    <!-- Keyboard Shortcuts Modal -->
+    <div class="modal" id="shortcutsModal">
+        <div class="modal-content shortcuts-content">
+            <button class="modal-close" id="shortcutsClose">&times;</button>
+            <h2>⌨️ Клавишни комбинации</h2>
+            <div class="shortcuts-list">
+                <div class="shortcut-item"><kbd>/</kbd> <span>Търсене</span></div>
+                <div class="shortcut-item"><kbd>Esc</kbd> <span>Затвори / Назад</span></div>
+                <div class="shortcut-item"><kbd>D</kbd> <span>Тъмен режим</span></div>
+                <div class="shortcut-item"><kbd>F</kbd> <span>Любими</span></div>
+                <div class="shortcut-item"><kbd>N</kbd> <span>Най-близки спирки</span></div>
+                <div class="shortcut-item"><kbd>R</kbd> <span>Нулирай изгледа</span></div>
+                <div class="shortcut-item"><kbd>L</kbd> <span>Моята локация</span></div>
+                <div class="shortcut-item"><kbd>?</kbd> <span>Покажи помощ</span></div>
+            </div>
+        </div>
     </div>
 
     <!-- Leaflet JS (local) -->

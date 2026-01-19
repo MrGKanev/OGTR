@@ -15,7 +15,12 @@
         stopMarkers: [],
         activeFilter: 'all',
         selectedLine: null,
-        sidebarOpen: false
+        sidebarOpen: false,
+        darkMode: localStorage.getItem('darkMode') === 'true',
+        favorites: JSON.parse(localStorage.getItem('favorites') || '{"lines":[],"stops":[]}'),
+        deferredInstallPrompt: null,
+        userLocation: null,
+        nearbyPanelOpen: false
     };
 
     // DOM Elements
@@ -35,7 +40,23 @@
         mapLegend: document.getElementById('mapLegend'),
         loadingOverlay: document.getElementById('loadingOverlay'),
         infoModal: document.getElementById('infoModal'),
-        modalClose: document.getElementById('modalClose')
+        modalClose: document.getElementById('modalClose'),
+        // New elements
+        darkModeToggle: document.getElementById('darkModeToggle'),
+        offlineIndicator: document.getElementById('offlineIndicator'),
+        installPrompt: document.getElementById('installPrompt'),
+        installBtn: document.getElementById('installBtn'),
+        installClose: document.getElementById('installClose'),
+        nearbyBtn: document.getElementById('nearbyBtn'),
+        favoritesBtn: document.getElementById('favoritesBtn'),
+        nearbyPanel: document.getElementById('nearbyPanel'),
+        nearbyContent: document.getElementById('nearbyContent'),
+        nearbyClose: document.getElementById('nearbyClose'),
+        favoriteLineBtn: document.getElementById('favoriteLineBtn'),
+        exportScheduleBtn: document.getElementById('exportScheduleBtn'),
+        shareLineBtn: document.getElementById('shareLineBtn'),
+        shortcutsModal: document.getElementById('shortcutsModal'),
+        shortcutsClose: document.getElementById('shortcutsClose')
     };
 
     // Colors
@@ -369,6 +390,8 @@
         }
 
         showLineDetails(lineId);
+        updateFavoriteButton();
+        updateUrl('line', lineId);
 
         elements.linesList.querySelectorAll('.line-item').forEach(item => {
             item.classList.toggle('active', item.dataset.lineId === lineId);
@@ -479,6 +502,11 @@
             }
         }
         state.selectedLine = null;
+
+        // Clear URL hash
+        if (window.location.hash) {
+            history.pushState(null, '', window.location.pathname);
+        }
 
         elements.linesList.querySelectorAll('.line-item').forEach(item => {
             item.classList.remove('active');
@@ -751,6 +779,432 @@
             : 'Легенда \u25bc';
     }
 
+    // ================================
+    // Dark Mode
+    // ================================
+    function initDarkMode() {
+        if (state.darkMode) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+    }
+
+    function toggleDarkMode() {
+        state.darkMode = !state.darkMode;
+        localStorage.setItem('darkMode', state.darkMode);
+        document.documentElement.setAttribute('data-theme', state.darkMode ? 'dark' : 'light');
+        showToast(state.darkMode ? 'Тъмен режим включен' : 'Светъл режим включен');
+    }
+
+    // ================================
+    // Offline Indicator
+    // ================================
+    function updateOnlineStatus() {
+        const isOffline = !navigator.onLine;
+        elements.offlineIndicator.classList.toggle('visible', isOffline);
+        document.body.classList.toggle('is-offline', isOffline);
+    }
+
+    // ================================
+    // PWA Install Prompt
+    // ================================
+    function initInstallPrompt() {
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            state.deferredInstallPrompt = e;
+
+            // Show prompt after 30 seconds if not already installed
+            const dismissed = localStorage.getItem('installPromptDismissed');
+            if (!dismissed) {
+                setTimeout(() => {
+                    if (state.deferredInstallPrompt) {
+                        elements.installPrompt.classList.add('visible');
+                    }
+                }, 30000);
+            }
+        });
+
+        window.addEventListener('appinstalled', () => {
+            state.deferredInstallPrompt = null;
+            elements.installPrompt.classList.remove('visible');
+            showToast('Приложението е инсталирано!');
+        });
+    }
+
+    function handleInstallClick() {
+        if (!state.deferredInstallPrompt) return;
+
+        state.deferredInstallPrompt.prompt();
+        state.deferredInstallPrompt.userChoice.then((choiceResult) => {
+            if (choiceResult.outcome === 'accepted') {
+                console.log('User accepted install');
+            }
+            state.deferredInstallPrompt = null;
+            elements.installPrompt.classList.remove('visible');
+        });
+    }
+
+    function dismissInstallPrompt() {
+        elements.installPrompt.classList.remove('visible');
+        localStorage.setItem('installPromptDismissed', 'true');
+    }
+
+    // ================================
+    // Toast Notifications
+    // ================================
+    function showToast(message, duration = 3000) {
+        let toast = document.querySelector('.toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.className = 'toast';
+            document.body.appendChild(toast);
+        }
+
+        toast.textContent = message;
+        toast.classList.add('visible');
+
+        setTimeout(() => {
+            toast.classList.remove('visible');
+        }, duration);
+    }
+
+    // ================================
+    // Favorites
+    // ================================
+    function saveFavorites() {
+        localStorage.setItem('favorites', JSON.stringify(state.favorites));
+    }
+
+    function toggleFavoriteLine(lineId) {
+        const index = state.favorites.lines.indexOf(lineId);
+        if (index > -1) {
+            state.favorites.lines.splice(index, 1);
+            showToast('Премахнато от любими');
+        } else {
+            state.favorites.lines.push(lineId);
+            showToast('Добавено в любими');
+        }
+        saveFavorites();
+        updateFavoriteButton();
+
+        // Update line item in list
+        const lineItem = elements.linesList.querySelector(`[data-line-id="${lineId}"]`);
+        if (lineItem) {
+            lineItem.classList.toggle('is-favorite', state.favorites.lines.includes(lineId));
+        }
+    }
+
+    function toggleFavoriteStop(stopId) {
+        const index = state.favorites.stops.indexOf(stopId);
+        if (index > -1) {
+            state.favorites.stops.splice(index, 1);
+            showToast('Спирката е премахната от любими');
+        } else {
+            state.favorites.stops.push(stopId);
+            showToast('Спирката е добавена в любими');
+        }
+        saveFavorites();
+    }
+
+    function updateFavoriteButton() {
+        if (!state.selectedLine) return;
+        const isFavorite = state.favorites.lines.includes(state.selectedLine);
+        elements.favoriteLineBtn.classList.toggle('is-favorite', isFavorite);
+        elements.favoriteLineBtn.title = isFavorite ? 'Премахни от любими' : 'Добави в любими';
+    }
+
+    function filterFavorites() {
+        if (state.favorites.lines.length === 0) {
+            showToast('Нямате любими линии');
+            return;
+        }
+
+        elements.linesList.querySelectorAll('.line-item').forEach(item => {
+            const lineId = item.dataset.lineId;
+            item.style.display = state.favorites.lines.includes(lineId) ? 'flex' : 'none';
+        });
+
+        elements.linesList.querySelectorAll('.line-group').forEach(group => {
+            const visibleItems = group.querySelectorAll('.line-item[style*="flex"]').length;
+            group.style.display = visibleItems > 0 ? 'block' : 'none';
+        });
+
+        // Update map
+        Object.keys(state.routeLayers).forEach(lineId => {
+            const layer = state.routeLayers[lineId];
+            if (state.favorites.lines.includes(lineId)) {
+                layer.addTo(state.map);
+            } else {
+                state.map.removeLayer(layer);
+            }
+        });
+    }
+
+    // ================================
+    // Nearby Stops
+    // ================================
+    function toggleNearbyPanel() {
+        state.nearbyPanelOpen = !state.nearbyPanelOpen;
+        elements.nearbyPanel.classList.toggle('active', state.nearbyPanelOpen);
+        elements.nearbyBtn.classList.toggle('active', state.nearbyPanelOpen);
+
+        if (state.nearbyPanelOpen) {
+            findNearbyStops();
+        }
+    }
+
+    function closeNearbyPanel() {
+        state.nearbyPanelOpen = false;
+        elements.nearbyPanel.classList.remove('active');
+        elements.nearbyBtn.classList.remove('active');
+    }
+
+    function findNearbyStops() {
+        elements.nearbyContent.innerHTML = '<p class="nearby-loading">Определяне на локация...</p>';
+
+        if (!('geolocation' in navigator)) {
+            elements.nearbyContent.innerHTML = '<p class="nearby-loading">Геолокацията не се поддържа</p>';
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                state.userLocation = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                displayNearbyStops();
+            },
+            (error) => {
+                console.error('Geolocation error:', error);
+                elements.nearbyContent.innerHTML = '<p class="nearby-loading">Неуспешно определяне на локацията</p>';
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    }
+
+    function calculateDistance(lat1, lng1, lat2, lng2) {
+        const R = 6371000; // Earth's radius in meters
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+
+    function displayNearbyStops() {
+        if (!state.userLocation) return;
+
+        const stopsWithDistance = Object.values(TRANSIT_DATA.STOPS).map(stop => ({
+            ...stop,
+            distance: calculateDistance(
+                state.userLocation.lat, state.userLocation.lng,
+                stop.lat, stop.lng
+            )
+        }));
+
+        stopsWithDistance.sort((a, b) => a.distance - b.distance);
+        const nearestStops = stopsWithDistance.slice(0, 5);
+
+        elements.nearbyContent.innerHTML = '';
+
+        nearestStops.forEach(stop => {
+            const card = document.createElement('div');
+            card.className = 'nearby-stop-card';
+
+            const distanceText = stop.distance < 1000
+                ? `${Math.round(stop.distance)} м`
+                : `${(stop.distance / 1000).toFixed(1)} км`;
+
+            card.innerHTML = `
+                <div class="nearby-stop-header">
+                    <span class="nearby-stop-name">${stop.name}</span>
+                    <span class="nearby-stop-distance">${distanceText}</span>
+                </div>
+                <div class="nearby-stop-lines"></div>
+            `;
+
+            const linesContainer = card.querySelector('.nearby-stop-lines');
+            stop.lines.forEach(lineId => {
+                const line = TRANSIT_DATA.getLine(lineId);
+                if (!line) return;
+
+                const badge = document.createElement('span');
+                badge.className = `line-badge ${line.type}`;
+                badge.textContent = line.number;
+                badge.style.cssText = 'min-width: 28px; height: 22px; font-size: 0.75rem; padding: 0 6px; cursor: pointer;';
+                badge.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectLine(lineId);
+                    closeNearbyPanel();
+                });
+                linesContainer.appendChild(badge);
+            });
+
+            card.addEventListener('click', () => {
+                state.map.setView([stop.lat, stop.lng], 17);
+                const marker = state.stopMarkers.find(m => m.data.id === stop.id);
+                if (marker) {
+                    marker.marker.openPopup();
+                }
+                closeNearbyPanel();
+                if (window.innerWidth <= 768) {
+                    closeSidebar();
+                }
+            });
+
+            elements.nearbyContent.appendChild(card);
+        });
+    }
+
+    // ================================
+    // Deep Linking (URL Routing)
+    // ================================
+    function initDeepLinking() {
+        // Handle initial URL
+        handleUrlChange();
+
+        // Listen for URL changes
+        window.addEventListener('popstate', handleUrlChange);
+    }
+
+    function handleUrlChange() {
+        const hash = window.location.hash.slice(1);
+        if (!hash) return;
+
+        const [type, id] = hash.split('/');
+
+        if (type === 'line' && id) {
+            setTimeout(() => selectLine(id), 500);
+        } else if (type === 'stop' && id) {
+            setTimeout(() => {
+                const stop = TRANSIT_DATA.STOPS[id];
+                if (stop) {
+                    state.map.setView([stop.lat, stop.lng], 17);
+                    const marker = state.stopMarkers.find(m => m.data.id === id);
+                    if (marker) {
+                        marker.marker.openPopup();
+                    }
+                }
+            }, 500);
+        }
+    }
+
+    function updateUrl(type, id) {
+        const newHash = `#${type}/${id}`;
+        if (window.location.hash !== newHash) {
+            history.pushState(null, '', newHash);
+        }
+    }
+
+    function shareCurrentLine() {
+        if (!state.selectedLine) return;
+
+        const url = `${window.location.origin}${window.location.pathname}#line/${state.selectedLine}`;
+
+        if (navigator.share) {
+            const line = TRANSIT_DATA.getLine(state.selectedLine);
+            navigator.share({
+                title: `Линия ${line.number} - Транспорт Русе`,
+                text: line.route,
+                url: url
+            }).catch(() => {});
+        } else {
+            navigator.clipboard.writeText(url).then(() => {
+                showToast('Линкът е копиран');
+            }).catch(() => {
+                showToast('Неуспешно копиране');
+            });
+        }
+    }
+
+    // ================================
+    // Schedule Export
+    // ================================
+    function exportSchedule() {
+        if (!state.selectedLine) return;
+
+        const line = TRANSIT_DATA.getLine(state.selectedLine);
+        if (!line) return;
+
+        // Set title for printing
+        const originalTitle = document.title;
+        document.title = `Линия ${line.number} - ${line.route} | Транспорт Русе`;
+
+        window.print();
+
+        // Restore title after print
+        setTimeout(() => {
+            document.title = originalTitle;
+        }, 1000);
+    }
+
+    // ================================
+    // Keyboard Shortcuts
+    // ================================
+    function handleKeyboardShortcuts(e) {
+        // Ignore if typing in input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            if (e.key === 'Escape') {
+                e.target.blur();
+            }
+            return;
+        }
+
+        switch (e.key.toLowerCase()) {
+            case '/':
+                e.preventDefault();
+                elements.searchInput.focus();
+                if (window.innerWidth <= 768) {
+                    toggleSidebar();
+                }
+                break;
+            case 'escape':
+                if (elements.shortcutsModal.classList.contains('active')) {
+                    elements.shortcutsModal.classList.remove('active');
+                } else if (elements.infoModal.classList.contains('active')) {
+                    elements.infoModal.classList.remove('active');
+                } else if (state.nearbyPanelOpen) {
+                    closeNearbyPanel();
+                } else if (state.selectedLine) {
+                    hideLineDetails();
+                } else if (state.sidebarOpen) {
+                    closeSidebar();
+                }
+                break;
+            case 'd':
+                toggleDarkMode();
+                break;
+            case 'f':
+                if (state.selectedLine) {
+                    toggleFavoriteLine(state.selectedLine);
+                } else {
+                    filterFavorites();
+                }
+                break;
+            case 'n':
+                toggleNearbyPanel();
+                if (window.innerWidth <= 768 && !state.sidebarOpen) {
+                    toggleSidebar();
+                }
+                break;
+            case 'r':
+                resetMapView();
+                break;
+            case 'l':
+                locateUser();
+                break;
+            case '?':
+                elements.shortcutsModal.classList.add('active');
+                break;
+        }
+    }
+
+    function showShortcutsModal() {
+        elements.shortcutsModal.classList.add('active');
+    }
+
     /**
      * Initialize event listeners
      */
@@ -759,7 +1213,14 @@
 
         elements.filterTabs.forEach(tab => {
             tab.addEventListener('click', () => {
-                filterLines(tab.dataset.filter);
+                const filter = tab.dataset.filter;
+                if (filter === 'favorites') {
+                    state.activeFilter = 'favorites';
+                    elements.filterTabs.forEach(t => t.classList.toggle('active', t === tab));
+                    filterFavorites();
+                } else {
+                    filterLines(filter);
+                }
             });
         });
 
@@ -801,17 +1262,65 @@
             state.map.invalidateSize();
         });
 
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                if (elements.infoModal.classList.contains('active')) {
-                    elements.infoModal.classList.remove('active');
-                } else if (state.selectedLine) {
-                    hideLineDetails();
-                } else if (state.sidebarOpen) {
-                    closeSidebar();
+        // Keyboard shortcuts
+        document.addEventListener('keydown', handleKeyboardShortcuts);
+
+        // Dark mode toggle
+        if (elements.darkModeToggle) {
+            elements.darkModeToggle.addEventListener('click', toggleDarkMode);
+        }
+
+        // Online/Offline status
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        updateOnlineStatus();
+
+        // PWA Install
+        if (elements.installBtn) {
+            elements.installBtn.addEventListener('click', handleInstallClick);
+        }
+        if (elements.installClose) {
+            elements.installClose.addEventListener('click', dismissInstallPrompt);
+        }
+
+        // Nearby stops
+        if (elements.nearbyBtn) {
+            elements.nearbyBtn.addEventListener('click', toggleNearbyPanel);
+        }
+        if (elements.nearbyClose) {
+            elements.nearbyClose.addEventListener('click', closeNearbyPanel);
+        }
+
+        // Favorites button in sidebar
+        if (elements.favoritesBtn) {
+            elements.favoritesBtn.addEventListener('click', () => {
+                state.activeFilter = 'favorites';
+                elements.filterTabs.forEach(t => t.classList.toggle('active', t.dataset.filter === 'favorites'));
+                filterFavorites();
+            });
+        }
+
+        // Line details actions
+        if (elements.favoriteLineBtn) {
+            elements.favoriteLineBtn.addEventListener('click', () => {
+                if (state.selectedLine) {
+                    toggleFavoriteLine(state.selectedLine);
                 }
-            }
-        });
+            });
+        }
+        if (elements.exportScheduleBtn) {
+            elements.exportScheduleBtn.addEventListener('click', exportSchedule);
+        }
+        if (elements.shareLineBtn) {
+            elements.shareLineBtn.addEventListener('click', shareCurrentLine);
+        }
+
+        // Shortcuts modal
+        if (elements.shortcutsClose) {
+            elements.shortcutsClose.addEventListener('click', () => {
+                elements.shortcutsModal.classList.remove('active');
+            });
+        }
     }
 
     /**
@@ -834,9 +1343,16 @@
             console.warn('Data validation warnings:', validation.warnings);
         }
 
+        // Initialize features
+        initDarkMode();
+        initInstallPrompt();
+
         initMap();
         populateLinesList();
         initEventListeners();
+
+        // Handle deep linking after map is ready
+        initDeepLinking();
 
         console.log('Ruse Transit Map initialized successfully');
         console.log('Stops:', Object.keys(TRANSIT_DATA.STOPS).length);
