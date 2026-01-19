@@ -1,0 +1,14 @@
+{
+  "name": "ogtr",
+  "version": "1.0.0",
+  "description": "Отворен Градски Транспорт Русе",
+  "private": true,
+  "scripts": {
+    "postinstall": "npm run copy-vendor",
+    "copy-vendor": "node scripts/copy-vendor.js",
+    "update": "npm update && npm run copy-vendor"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4"
+  }
+}

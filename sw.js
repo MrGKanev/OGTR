@@ -2,19 +2,21 @@
  * Service Worker for Транспорт Русе PWA
  */
 
-const CACHE_NAME = 'transport-ruse-v1';
+const CACHE_NAME = 'transport-ruse-v2';
 const STATIC_ASSETS = [
     './',
     './index.html',
     './css/style.css',
     './js/data-normalized.js',
     './js/app.js',
-    './manifest.json'
-];
-
-const EXTERNAL_ASSETS = [
-    'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-    'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+    './manifest.json',
+    './vendor/leaflet/leaflet.css',
+    './vendor/leaflet/leaflet.js',
+    './vendor/leaflet/images/marker-icon.png',
+    './vendor/leaflet/images/marker-icon-2x.png',
+    './vendor/leaflet/images/marker-shadow.png',
+    './vendor/leaflet/images/layers.png',
+    './vendor/leaflet/images/layers-2x.png'
 ];
 
 // Install - cache static assets
@@ -74,8 +76,7 @@ self.addEventListener('fetch', event => {
     }
 
     // For static assets - cache first
-    if (STATIC_ASSETS.some(asset => request.url.includes(asset)) ||
-        EXTERNAL_ASSETS.some(asset => request.url.includes(asset))) {
+    if (STATIC_ASSETS.some(asset => request.url.includes(asset))) {
         event.respondWith(
             caches.match(request)
                 .then(cached => {

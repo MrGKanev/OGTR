@@ -34,45 +34,6 @@ OGTR/
 └── README.md           # Документация
 ```
 
-## Локално стартиране
-
-1. Клонирай репозиторито:
-```bash
-git clone https://github.com/YOUR_USERNAME/OGTR.git
-cd OGTR
-```
-
-2. Стартирай локален сървър (необходим заради CORS):
-```bash
-# С Python 3
-python3 -m http.server 8000
-
-# Или с Node.js
-npx serve
-```
-
-3. Отвори в браузъра: http://localhost:8000
-
-## Деплой в GitHub Pages
-
-1. Създай ново репозитори в GitHub
-
-2. Push-ни кода:
-```bash
-git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/YOUR_USERNAME/OGTR.git
-git push -u origin master
-```
-
-3. Активирай GitHub Pages:
-   - Отиди в Settings → Pages
-   - Source: Deploy from a branch
-   - Branch: master / (root)
-   - Save
-
-4. Сайтът ще бъде достъпен на: `https://YOUR_USERNAME.github.io/OGTR/`
-
 ## Източници на данни
 
 Информацията за линиите и разписанията е събрана от:
@@ -116,24 +77,8 @@ git push -u origin master
 | 30 | ж.к. Чародейка - Хотел Рига - Център |
 | 33 | Гара Разпределителна - Образцов чифлик |
 
-## Бъдещи подобрения
-
-- [ ] Реални GPS позиции на превозните средства (ако има API)
-- [ ] По-точни GeoJSON маршрути от OpenStreetMap
-- [ ] Интеграция с GTFS данни (ако има публични)
-- [ ] Push notifications за промени в разписанията
-- [ ] PWA функционалност за офлайн достъп
-
 ## Забележки
 
 - Маршрутите на картата са приблизителни
 - За точни разписания проверете официалните източници
 - Данните са актуални към януари 2026
-
-## Лиценз
-
-MIT License - свободно за използване и модификация.
-
-## Принос
-
-Pull requests са добре дошли! Ако имате по-точни данни за маршрутите или спирките, не се колебайте да допринесете.
