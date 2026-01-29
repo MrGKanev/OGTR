@@ -1,8 +1,14 @@
 /**
  * Service Worker for Транспорт Русе PWA
+ *
+ * Version format: transport-ruse-vX.Y where X is major, Y is build date
+ * Update CACHE_VERSION when making changes to cached files
  */
 
-const CACHE_NAME = 'transport-ruse-v3';
+const CACHE_VERSION = 4;
+const BUILD_DATE = '2026-01-29';
+const CACHE_NAME = `transport-ruse-v${CACHE_VERSION}`;
+const TILES_CACHE_NAME = `${CACHE_NAME}-tiles`;
 const STATIC_ASSETS = [
     './',
     './index.html',
@@ -31,14 +37,16 @@ self.addEventListener('install', event => {
     );
 });
 
-// Activate - clean old caches
+// Activate - clean old caches (including old tile caches)
 self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys()
             .then(keys => {
                 return Promise.all(
-                    keys.filter(key => key !== CACHE_NAME)
-                        .map(key => caches.delete(key))
+                    keys.filter(key => {
+                        // Keep current cache and current tiles cache
+                        return key !== CACHE_NAME && key !== TILES_CACHE_NAME;
+                    }).map(key => caches.delete(key))
                 );
             })
             .then(() => self.clients.claim())
@@ -56,7 +64,7 @@ self.addEventListener('fetch', event => {
     // For map tiles - cache with network fallback
     if (url.hostname.includes('tile.openstreetmap.org')) {
         event.respondWith(
-            caches.open(CACHE_NAME + '-tiles')
+            caches.open(TILES_CACHE_NAME)
                 .then(cache => {
                     return cache.match(request)
                         .then(cached => {

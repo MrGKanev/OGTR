@@ -8,6 +8,65 @@
 (function() {
     'use strict';
 
+    // ================================
+    // Constants
+    // ================================
+    const TIMING = {
+        LOADING_OVERLAY_DELAY: 500,
+        MOBILE_CLOSE_DELAY: 300,
+        DEEP_LINK_DELAY: 500,
+        TOAST_DURATION: 3000,
+        PRINT_TITLE_RESTORE: 1000,
+        INSTALL_PROMPT_DELAY: 30000,
+        GEOLOCATION_TIMEOUT: 10000,
+        SEARCH_DEBOUNCE: 300
+    };
+
+    // ================================
+    // Safe localStorage helpers
+    // ================================
+    function safeGetItem(key, defaultValue) {
+        try {
+            const item = localStorage.getItem(key);
+            return item !== null ? item : defaultValue;
+        } catch (e) {
+            return defaultValue;
+        }
+    }
+
+    function safeSetItem(key, value) {
+        try {
+            localStorage.setItem(key, value);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function safeGetJSON(key, defaultValue) {
+        try {
+            const item = localStorage.getItem(key);
+            return item ? JSON.parse(item) : defaultValue;
+        } catch (e) {
+            return defaultValue;
+        }
+    }
+
+    // ================================
+    // Debounce utility
+    // ================================
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
     // Application state
     const state = {
         map: null,
@@ -16,48 +75,65 @@
         activeFilter: 'all',
         selectedLine: null,
         sidebarOpen: false,
-        darkMode: localStorage.getItem('darkMode') === 'true',
-        favorites: JSON.parse(localStorage.getItem('favorites') || '{"lines":[],"stops":[]}'),
+        darkMode: safeGetItem('darkMode', 'false') === 'true',
+        favorites: safeGetJSON('favorites', { lines: [], stops: [] }),
         deferredInstallPrompt: null,
         userLocation: null,
         nearbyPanelOpen: false
     };
 
-    // DOM Elements
+    // DOM Elements with validation
+    function getElement(id) {
+        const el = document.getElementById(id);
+        if (!el) {
+            console.warn(`Element with id "${id}" not found`);
+        }
+        return el;
+    }
+
     const elements = {
-        map: document.getElementById('map'),
-        sidebar: document.getElementById('sidebar'),
-        menuToggle: document.getElementById('menuToggle'),
-        linesList: document.getElementById('linesList'),
-        lineDetails: document.getElementById('lineDetails'),
-        searchInput: document.getElementById('searchInput'),
-        searchClear: document.getElementById('searchClear'),
+        map: getElement('map'),
+        sidebar: getElement('sidebar'),
+        menuToggle: getElement('menuToggle'),
+        linesList: getElement('linesList'),
+        lineDetails: getElement('lineDetails'),
+        searchInput: getElement('searchInput'),
+        searchClear: getElement('searchClear'),
         filterTabs: document.querySelectorAll('.filter-tab'),
-        backBtn: document.getElementById('backBtn'),
-        locateBtn: document.getElementById('locateBtn'),
-        resetBtn: document.getElementById('resetBtn'),
-        legendToggle: document.getElementById('legendToggle'),
-        mapLegend: document.getElementById('mapLegend'),
-        loadingOverlay: document.getElementById('loadingOverlay'),
-        infoModal: document.getElementById('infoModal'),
-        modalClose: document.getElementById('modalClose'),
+        backBtn: getElement('backBtn'),
+        locateBtn: getElement('locateBtn'),
+        resetBtn: getElement('resetBtn'),
+        legendToggle: getElement('legendToggle'),
+        mapLegend: getElement('mapLegend'),
+        loadingOverlay: getElement('loadingOverlay'),
+        infoModal: getElement('infoModal'),
+        modalClose: getElement('modalClose'),
         // New elements
-        darkModeToggle: document.getElementById('darkModeToggle'),
-        offlineIndicator: document.getElementById('offlineIndicator'),
-        installPrompt: document.getElementById('installPrompt'),
-        installBtn: document.getElementById('installBtn'),
-        installClose: document.getElementById('installClose'),
-        nearbyBtn: document.getElementById('nearbyBtn'),
-        favoritesBtn: document.getElementById('favoritesBtn'),
-        nearbyPanel: document.getElementById('nearbyPanel'),
-        nearbyContent: document.getElementById('nearbyContent'),
-        nearbyClose: document.getElementById('nearbyClose'),
-        favoriteLineBtn: document.getElementById('favoriteLineBtn'),
-        exportScheduleBtn: document.getElementById('exportScheduleBtn'),
-        shareLineBtn: document.getElementById('shareLineBtn'),
-        shortcutsModal: document.getElementById('shortcutsModal'),
-        shortcutsClose: document.getElementById('shortcutsClose')
+        darkModeToggle: getElement('darkModeToggle'),
+        offlineIndicator: getElement('offlineIndicator'),
+        installPrompt: getElement('installPrompt'),
+        installBtn: getElement('installBtn'),
+        installClose: getElement('installClose'),
+        nearbyBtn: getElement('nearbyBtn'),
+        favoritesBtn: getElement('favoritesBtn'),
+        nearbyPanel: getElement('nearbyPanel'),
+        nearbyContent: getElement('nearbyContent'),
+        nearbyClose: getElement('nearbyClose'),
+        favoriteLineBtn: getElement('favoriteLineBtn'),
+        exportScheduleBtn: getElement('exportScheduleBtn'),
+        shareLineBtn: getElement('shareLineBtn'),
+        shortcutsModal: getElement('shortcutsModal'),
+        shortcutsClose: getElement('shortcutsClose')
     };
+
+    // Validate critical elements
+    function validateElements() {
+        const critical = ['map', 'sidebar', 'linesList'];
+        const missing = critical.filter(id => !elements[id]);
+        if (missing.length > 0) {
+            throw new Error(`Critical elements missing: ${missing.join(', ')}`);
+        }
+    }
 
     // Colors
     const COLORS = {
@@ -94,8 +170,10 @@
         addStopsToMap();
 
         setTimeout(() => {
-            elements.loadingOverlay.classList.add('hidden');
-        }, 500);
+            if (elements.loadingOverlay) {
+                elements.loadingOverlay.classList.add('hidden');
+            }
+        }, TIMING.LOADING_OVERLAY_DELAY);
     }
 
     /**
@@ -400,7 +478,7 @@
         if (window.innerWidth <= 768) {
             setTimeout(() => {
                 closeSidebar();
-            }, 300);
+            }, TIMING.MOBILE_CLOSE_DELAY);
         }
     }
 
@@ -747,12 +825,24 @@
                         .openPopup();
                 },
                 error => {
-                    console.error('Geolocation error:', error);
-                    alert('Не може да се определи локацията. Моля, разрешете достъп до местоположението.');
-                }
+                    let message = 'Не може да се определи локацията.';
+                    switch (error.code) {
+                        case error.PERMISSION_DENIED:
+                            message = 'Достъпът до местоположението е отказан.';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            message = 'Информацията за местоположението не е достъпна.';
+                            break;
+                        case error.TIMEOUT:
+                            message = 'Заявката за местоположение изтече.';
+                            break;
+                    }
+                    showToast(message);
+                },
+                { enableHighAccuracy: true, timeout: TIMING.GEOLOCATION_TIMEOUT }
             );
         } else {
-            alert('Браузърът не поддържа геолокация.');
+            showToast('Браузърът не поддържа геолокация.');
         }
     }
 
@@ -790,7 +880,7 @@
 
     function toggleDarkMode() {
         state.darkMode = !state.darkMode;
-        localStorage.setItem('darkMode', state.darkMode);
+        safeSetItem('darkMode', state.darkMode);
         document.documentElement.setAttribute('data-theme', state.darkMode ? 'dark' : 'light');
         showToast(state.darkMode ? 'Тъмен режим включен' : 'Светъл режим включен');
     }
@@ -812,20 +902,22 @@
             e.preventDefault();
             state.deferredInstallPrompt = e;
 
-            // Show prompt after 30 seconds if not already installed
-            const dismissed = localStorage.getItem('installPromptDismissed');
+            // Show prompt after delay if not already dismissed
+            const dismissed = safeGetItem('installPromptDismissed', null);
             if (!dismissed) {
                 setTimeout(() => {
-                    if (state.deferredInstallPrompt) {
+                    if (state.deferredInstallPrompt && elements.installPrompt) {
                         elements.installPrompt.classList.add('visible');
                     }
-                }, 30000);
+                }, TIMING.INSTALL_PROMPT_DELAY);
             }
         });
 
         window.addEventListener('appinstalled', () => {
             state.deferredInstallPrompt = null;
-            elements.installPrompt.classList.remove('visible');
+            if (elements.installPrompt) {
+                elements.installPrompt.classList.remove('visible');
+            }
             showToast('Приложението е инсталирано!');
         });
     }
@@ -834,28 +926,31 @@
         if (!state.deferredInstallPrompt) return;
 
         state.deferredInstallPrompt.prompt();
-        state.deferredInstallPrompt.userChoice.then((choiceResult) => {
-            if (choiceResult.outcome === 'accepted') {
-                console.log('User accepted install');
-            }
+        state.deferredInstallPrompt.userChoice.then(() => {
             state.deferredInstallPrompt = null;
-            elements.installPrompt.classList.remove('visible');
+            if (elements.installPrompt) {
+                elements.installPrompt.classList.remove('visible');
+            }
         });
     }
 
     function dismissInstallPrompt() {
-        elements.installPrompt.classList.remove('visible');
-        localStorage.setItem('installPromptDismissed', 'true');
+        if (elements.installPrompt) {
+            elements.installPrompt.classList.remove('visible');
+        }
+        safeSetItem('installPromptDismissed', 'true');
     }
 
     // ================================
     // Toast Notifications
     // ================================
-    function showToast(message, duration = 3000) {
+    function showToast(message, duration = TIMING.TOAST_DURATION) {
         let toast = document.querySelector('.toast');
         if (!toast) {
             toast = document.createElement('div');
             toast.className = 'toast';
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'polite');
             document.body.appendChild(toast);
         }
 
@@ -871,7 +966,7 @@
     // Favorites
     // ================================
     function saveFavorites() {
-        localStorage.setItem('favorites', JSON.stringify(state.favorites));
+        safeSetItem('favorites', JSON.stringify(state.favorites));
     }
 
     function toggleFavoriteLine(lineId) {
@@ -959,10 +1054,17 @@
     }
 
     function findNearbyStops() {
-        elements.nearbyContent.innerHTML = '<p class="nearby-loading">Определяне на локация...</p>';
+        if (!elements.nearbyContent) return;
+
+        // Use textContent for safer rendering
+        const loadingP = document.createElement('p');
+        loadingP.className = 'nearby-loading';
+        loadingP.textContent = 'Определяне на локация...';
+        elements.nearbyContent.textContent = '';
+        elements.nearbyContent.appendChild(loadingP);
 
         if (!('geolocation' in navigator)) {
-            elements.nearbyContent.innerHTML = '<p class="nearby-loading">Геолокацията не се поддържа</p>';
+            loadingP.textContent = 'Геолокацията не се поддържа';
             return;
         }
 
@@ -975,10 +1077,13 @@
                 displayNearbyStops();
             },
             (error) => {
-                console.error('Geolocation error:', error);
-                elements.nearbyContent.innerHTML = '<p class="nearby-loading">Неуспешно определяне на локацията</p>';
+                let message = 'Неуспешно определяне на локацията';
+                if (error.code === error.PERMISSION_DENIED) {
+                    message = 'Достъпът до местоположението е отказан';
+                }
+                loadingP.textContent = message;
             },
-            { enableHighAccuracy: true, timeout: 10000 }
+            { enableHighAccuracy: true, timeout: TIMING.GEOLOCATION_TIMEOUT }
         );
     }
 
@@ -994,7 +1099,7 @@
     }
 
     function displayNearbyStops() {
-        if (!state.userLocation) return;
+        if (!state.userLocation || !elements.nearbyContent) return;
 
         const stopsWithDistance = Object.values(TRANSIT_DATA.STOPS).map(stop => ({
             ...stop,
@@ -1007,7 +1112,7 @@
         stopsWithDistance.sort((a, b) => a.distance - b.distance);
         const nearestStops = stopsWithDistance.slice(0, 5);
 
-        elements.nearbyContent.innerHTML = '';
+        elements.nearbyContent.textContent = '';
 
         nearestStops.forEach(stop => {
             const card = document.createElement('div');
@@ -1017,15 +1122,25 @@
                 ? `${Math.round(stop.distance)} м`
                 : `${(stop.distance / 1000).toFixed(1)} км`;
 
-            card.innerHTML = `
-                <div class="nearby-stop-header">
-                    <span class="nearby-stop-name">${stop.name}</span>
-                    <span class="nearby-stop-distance">${distanceText}</span>
-                </div>
-                <div class="nearby-stop-lines"></div>
-            `;
+            // Build card content safely
+            const header = document.createElement('div');
+            header.className = 'nearby-stop-header';
 
-            const linesContainer = card.querySelector('.nearby-stop-lines');
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'nearby-stop-name';
+            nameSpan.textContent = stop.name;
+
+            const distanceSpan = document.createElement('span');
+            distanceSpan.className = 'nearby-stop-distance';
+            distanceSpan.textContent = distanceText;
+
+            header.appendChild(nameSpan);
+            header.appendChild(distanceSpan);
+            card.appendChild(header);
+
+            const linesContainer = document.createElement('div');
+            linesContainer.className = 'nearby-stop-lines';
+
             stop.lines.forEach(lineId => {
                 const line = TRANSIT_DATA.getLine(lineId);
                 if (!line) return;
@@ -1034,6 +1149,8 @@
                 badge.className = `line-badge ${line.type}`;
                 badge.textContent = line.number;
                 badge.style.cssText = 'min-width: 28px; height: 22px; font-size: 0.75rem; padding: 0 6px; cursor: pointer;';
+                badge.setAttribute('role', 'button');
+                badge.setAttribute('aria-label', `Линия ${line.number}`);
                 badge.addEventListener('click', (e) => {
                     e.stopPropagation();
                     selectLine(lineId);
@@ -1041,6 +1158,8 @@
                 });
                 linesContainer.appendChild(badge);
             });
+
+            card.appendChild(linesContainer);
 
             card.addEventListener('click', () => {
                 state.map.setView([stop.lat, stop.lng], 17);
@@ -1076,7 +1195,7 @@
         const [type, id] = hash.split('/');
 
         if (type === 'line' && id) {
-            setTimeout(() => selectLine(id), 500);
+            setTimeout(() => selectLine(id), TIMING.DEEP_LINK_DELAY);
         } else if (type === 'stop' && id) {
             setTimeout(() => {
                 const stop = TRANSIT_DATA.STOPS[id];
@@ -1087,7 +1206,7 @@
                         marker.marker.openPopup();
                     }
                 }
-            }, 500);
+            }, TIMING.DEEP_LINK_DELAY);
         }
     }
 
@@ -1109,7 +1228,12 @@
                 title: `Линия ${line.number} - Транспорт Русе`,
                 text: line.route,
                 url: url
-            }).catch(() => {});
+            }).catch((error) => {
+                // Only show error if not user cancellation
+                if (error.name !== 'AbortError') {
+                    showToast('Споделянето не успя');
+                }
+            });
         } else {
             navigator.clipboard.writeText(url).then(() => {
                 showToast('Линкът е копиран');
@@ -1137,7 +1261,7 @@
         // Restore title after print
         setTimeout(() => {
             document.title = originalTitle;
-        }, 1000);
+        }, TIMING.PRINT_TITLE_RESTORE);
     }
 
     // ================================
@@ -1224,9 +1348,16 @@
             });
         });
 
+        // Debounced search for better performance
+        const debouncedSearch = debounce((value) => {
+            searchLines(value);
+        }, TIMING.SEARCH_DEBOUNCE);
+
         elements.searchInput.addEventListener('input', (e) => {
-            searchLines(e.target.value);
-            elements.searchClear.classList.toggle('visible', e.target.value.length > 0);
+            debouncedSearch(e.target.value);
+            if (elements.searchClear) {
+                elements.searchClear.classList.toggle('visible', e.target.value.length > 0);
+            }
         });
 
         elements.searchClear.addEventListener('click', () => {
@@ -1327,20 +1458,25 @@
      * Initialize the application
      */
     function init() {
-        console.log('Initializing Ruse Transit Map...');
-
+        // Check for required data
         if (typeof TRANSIT_DATA === 'undefined') {
-            console.error('Transit data not loaded');
+            showErrorState('Данните за транспорта не са заредени. Моля, опреснете страницата.');
             return;
         }
 
-        // Run validation in development
+        // Validate DOM elements
+        try {
+            validateElements();
+        } catch (error) {
+            showErrorState('Грешка при зареждане на страницата. Моля, опреснете.');
+            return;
+        }
+
+        // Run data validation - fail fast on errors
         const validation = TRANSIT_DATA.validateData();
         if (!validation.valid) {
-            console.error('Data validation errors:', validation.errors);
-        }
-        if (validation.warnings.length > 0) {
-            console.warn('Data validation warnings:', validation.warnings);
+            showErrorState('Грешка в данните за транспорта. Моля, опреснете страницата.');
+            return;
         }
 
         // Initialize features
@@ -1353,10 +1489,22 @@
 
         // Handle deep linking after map is ready
         initDeepLinking();
+    }
 
-        console.log('Ruse Transit Map initialized successfully');
-        console.log('Stops:', Object.keys(TRANSIT_DATA.STOPS).length);
-        console.log('Lines:', Object.keys(TRANSIT_DATA.LINES).length);
+    /**
+     * Show error state to user
+     */
+    function showErrorState(message) {
+        const overlay = elements.loadingOverlay;
+        if (overlay) {
+            const spinner = overlay.querySelector('.loading-spinner');
+            const text = overlay.querySelector('p');
+            if (spinner) spinner.style.display = 'none';
+            if (text) {
+                text.textContent = message;
+                text.style.color = '#dc2626';
+            }
+        }
     }
 
     if (document.readyState === 'loading') {
