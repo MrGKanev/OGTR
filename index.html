@@ -18,7 +18,7 @@
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://YOUR_USERNAME.github.io/OGTR/">
+    <meta property="og:url" content="https://mrgkanev.github.io/OGTR/">
     <meta property="og:title" content="Градски транспорт Русе - Интерактивна карта">
     <meta property="og:description" content="Безплатна карта на градския транспорт в Русе. 7 тролейбусни и 17 автобусни линии с маршрути, спирки и разписания в реално време.">
     <meta property="og:locale" content="bg_BG">
@@ -30,7 +30,7 @@
     <meta name="twitter:description" content="Безплатна карта на автобуси и тролейбуси в Русе. Маршрути, спирки и разписания.">
 
     <!-- Canonical URL -->
-    <link rel="canonical" href="https://YOUR_USERNAME.github.io/OGTR/">
+    <link rel="canonical" href="https://mrgkanev.github.io/OGTR/">
 
     <!-- Structured Data (JSON-LD) -->
     <script type="application/ld+json">
@@ -40,7 +40,7 @@
         "name": "Градски транспорт Русе",
         "alternateName": "OGTR - Отворен Градски Транспорт Русе",
         "description": "Безплатна интерактивна карта на градския транспорт в Русе, България с автобусни и тролейбусни линии, спирки и разписания.",
-        "url": "https://YOUR_USERNAME.github.io/OGTR/",
+        "url": "https://mrgkanev.github.io/OGTR/",
         "applicationCategory": "TransportApplication",
         "operatingSystem": "Any",
         "browserRequirements": "Requires JavaScript",
@@ -149,11 +149,11 @@
                         </button>
                     </div>
                 </div>
-                <div class="filter-tabs">
-                    <button class="filter-tab active" data-filter="all">Всички</button>
-                    <button class="filter-tab" data-filter="trolleybus">Тролейбуси</button>
-                    <button class="filter-tab" data-filter="bus">Автобуси</button>
-                    <button class="filter-tab" data-filter="favorites">⭐</button>
+                <div class="filter-tabs" role="tablist" aria-label="Филтриране на линии">
+                    <button class="filter-tab active" data-filter="all" role="tab" aria-selected="true">Всички</button>
+                    <button class="filter-tab" data-filter="trolleybus" role="tab" aria-selected="false">Тролейбуси</button>
+                    <button class="filter-tab" data-filter="bus" role="tab" aria-selected="false">Автобуси</button>
+                    <button class="filter-tab" data-filter="favorites" role="tab" aria-selected="false" aria-label="Любими линии">⭐</button>
                 </div>
             </div>
 
@@ -216,32 +216,32 @@
 
         <!-- Map Container -->
         <div class="map-container">
-            <div id="map"></div>
+            <div id="map" role="application" aria-label="Интерактивна карта на градския транспорт в Русе"></div>
 
             <!-- Map Controls -->
-            <div class="map-controls">
-                <button class="map-control-btn" id="locateBtn" title="Моята локация">
+            <div class="map-controls" role="group" aria-label="Контроли на картата">
+                <button class="map-control-btn" id="locateBtn" title="Моята локация" aria-label="Покажи моята локация на картата">
                     📍
                 </button>
-                <button class="map-control-btn" id="resetBtn" title="Покажи целия град">
+                <button class="map-control-btn" id="resetBtn" title="Покажи целия град" aria-label="Нулирай изгледа на картата">
                     🔄
                 </button>
             </div>
 
             <!-- Legend -->
-            <div class="map-legend" id="mapLegend">
-                <button class="legend-toggle" id="legendToggle">Легенда ▼</button>
-                <div class="legend-content">
+            <div class="map-legend" id="mapLegend" role="region" aria-label="Легенда на картата">
+                <button class="legend-toggle" id="legendToggle" aria-expanded="false" aria-controls="legendContent">Легенда ▼</button>
+                <div class="legend-content" id="legendContent">
                     <div class="legend-item">
-                        <span class="legend-line trolleybus-line"></span>
-                        <span>Тролейбус</span>
+                        <span class="legend-line trolleybus-line" aria-hidden="true"></span>
+                        <span>Тролейбус (червена линия)</span>
                     </div>
                     <div class="legend-item">
-                        <span class="legend-line bus-line"></span>
-                        <span>Автобус</span>
+                        <span class="legend-line bus-line" aria-hidden="true"></span>
+                        <span>Автобус (зелена линия)</span>
                     </div>
                     <div class="legend-item">
-                        <span class="legend-stop"></span>
+                        <span class="legend-stop" aria-hidden="true"></span>
                         <span>Спирка</span>
                     </div>
                 </div>
@@ -250,10 +250,10 @@
     </main>
 
     <!-- Info Modal -->
-    <div class="modal" id="infoModal">
+    <div class="modal" id="infoModal" role="dialog" aria-modal="true" aria-labelledby="infoModalTitle">
         <div class="modal-content">
-            <button class="modal-close" id="modalClose">&times;</button>
-            <h2>За проекта</h2>
+            <button class="modal-close" id="modalClose" aria-label="Затвори">&times;</button>
+            <h2 id="infoModalTitle">За проекта</h2>
             <p>Тази интерактивна карта е отворен проект (open source) за визуализация на градския транспорт в Русе.</p>
             <h3>Данни</h3>
             <p>Информацията за линиите и разписанията е събрана от публични източници:</p>
@@ -269,16 +269,16 @@
     </div>
 
     <!-- Loading Overlay -->
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="loading-spinner"></div>
+    <div class="loading-overlay" id="loadingOverlay" role="status" aria-live="polite">
+        <div class="loading-spinner" aria-hidden="true"></div>
         <p>Зареждане на картата...</p>
     </div>
 
     <!-- Keyboard Shortcuts Modal -->
-    <div class="modal" id="shortcutsModal">
+    <div class="modal" id="shortcutsModal" role="dialog" aria-modal="true" aria-labelledby="shortcutsModalTitle">
         <div class="modal-content shortcuts-content">
-            <button class="modal-close" id="shortcutsClose">&times;</button>
-            <h2>⌨️ Клавишни комбинации</h2>
+            <button class="modal-close" id="shortcutsClose" aria-label="Затвори">&times;</button>
+            <h2 id="shortcutsModalTitle">⌨️ Клавишни комбинации</h2>
             <div class="shortcuts-list">
                 <div class="shortcut-item"><kbd>/</kbd> <span>Търсене</span></div>
                 <div class="shortcut-item"><kbd>Esc</kbd> <span>Затвори / Назад</span></div>

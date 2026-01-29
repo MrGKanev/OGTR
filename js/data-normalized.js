@@ -1497,10 +1497,13 @@ function calculateEstimatedArrival(lineId, stopId) {
     const stopCount = line.stops.length;
     const positionRatio = stopIndex >= 0 ? stopIndex / stopCount : 0.5;
 
-    // Estimate minutes until next arrival (using position)
-    const baseMinutes = Math.floor(Math.random() * avgFrequency);
-    const positionAdjustment = Math.floor(positionRatio * avgFrequency * 0.5);
-    const minutesUntilNext = Math.max(0, baseMinutes + positionAdjustment);
+    // Calculate minutes until next arrival based on current time and frequency
+    // This creates a consistent, time-based estimate instead of random
+    const minutesSinceFirstService = currentTimeMinutes - firstTimeMinutes;
+    const cyclePosition = minutesSinceFirstService % avgFrequency;
+    const baseMinutes = avgFrequency - cyclePosition;
+    const positionAdjustment = Math.floor(positionRatio * avgFrequency * 0.3);
+    const minutesUntilNext = Math.max(1, Math.min(baseMinutes + positionAdjustment, avgFrequency));
 
     const nextArrivalMinutes = currentTimeMinutes + minutesUntilNext;
     const nextHour = Math.floor(nextArrivalMinutes / 60);
