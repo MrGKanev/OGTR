@@ -23,6 +23,13 @@
     };
 
     // ================================
+    // i18n helper
+    // ================================
+    function t(key, params) {
+        return typeof I18n !== 'undefined' ? I18n.t(key, params) : key;
+    }
+
+    // ================================
     // Safe localStorage helpers
     // ================================
     function safeGetItem(key, defaultValue) {
@@ -79,7 +86,13 @@
         favorites: safeGetJSON('favorites', { lines: [], stops: [] }),
         deferredInstallPrompt: null,
         userLocation: null,
-        nearbyPanelOpen: false
+        userLocationMarker: null,
+        nearbyPanelOpen: false,
+        routePlannerOpen: false,
+        routeFromStopId: null,
+        routeToStopId: null,
+        routePlannerLayers: [],
+        walkingLine: null
     };
 
     // DOM Elements with validation
@@ -123,7 +136,18 @@
         exportScheduleBtn: getElement('exportScheduleBtn'),
         shareLineBtn: getElement('shareLineBtn'),
         shortcutsModal: getElement('shortcutsModal'),
-        shortcutsClose: getElement('shortcutsClose')
+        shortcutsClose: getElement('shortcutsClose'),
+        routePlannerPanel: getElement('routePlannerPanel'),
+        routePlannerBtn: getElement('routePlannerBtn'),
+        routePlannerClose: getElement('routePlannerClose'),
+        routeFrom: getElement('routeFrom'),
+        routeTo: getElement('routeTo'),
+        routeFromSuggestions: getElement('routeFromSuggestions'),
+        routeToSuggestions: getElement('routeToSuggestions'),
+        routeSwapBtn: getElement('routeSwapBtn'),
+        routeSearchBtn: getElement('routeSearchBtn'),
+        routeResults: getElement('routeResults'),
+        stopSearchResults: null // Created during init
     };
 
     // Validate critical elements
@@ -151,7 +175,7 @@
     /**
      * Initialize the map
      */
-    function initMap() {
+    async function initMap() {
         state.map = L.map('map', {
             center: TRANSIT_DATA.center,
             zoom: TRANSIT_DATA.defaultZoom,
@@ -166,8 +190,12 @@
 
         state.map.zoomControl.setPosition('topright');
 
-        addRoutesToMap();
+        // Add stops immediately (no async dependency)
         addStopsToMap();
+
+        // Fetch route geometries async, then add routes
+        await TRANSIT_DATA.loadRouteGeometries();
+        addRoutesToMap();
 
         setTimeout(() => {
             if (elements.loadingOverlay) {
@@ -234,49 +262,58 @@
     }
 
     /**
-     * Add stop markers to the map
+     * Add stop markers to the map (with clustering)
      */
     function addStopsToMap() {
         const stopsGeoJSON = TRANSIT_DATA.createStopsGeoJSON();
+
+        const clusterGroup = L.markerClusterGroup({
+            maxClusterRadius: 40,
+            disableClusteringAtZoom: 15,
+            iconCreateFunction: function(cluster) {
+                const count = cluster.getChildCount();
+                return L.divIcon({
+                    html: '<div class="stop-cluster-icon">' + count + '</div>',
+                    className: 'stop-cluster',
+                    iconSize: [32, 32]
+                });
+            }
+        });
 
         stopsGeoJSON.features.forEach(feature => {
             const props = feature.properties;
             const coords = feature.geometry.coordinates;
 
-            let radius = 6;
-            let color = COLORS.stopRegular;
-            if (props.type === 'major') {
-                radius = 8;
-                color = COLORS.stopMajor;
-            } else if (props.type === 'terminal') {
-                radius = 7;
-                color = COLORS.stopTerminal;
-            }
+            let dotClass = 'regular';
+            if (props.type === 'major') dotClass = 'major';
+            else if (props.type === 'terminal') dotClass = 'terminal';
 
-            const marker = L.circleMarker([coords[1], coords[0]], {
-                radius: radius,
-                fillColor: color,
-                color: '#ffffff',
-                weight: 2,
-                opacity: 1,
-                fillOpacity: 0.9
+            const icon = L.divIcon({
+                html: '<div class="stop-dot ' + dotClass + '"></div>',
+                className: 'stop-marker-wrapper',
+                iconSize: [16, 16],
+                iconAnchor: [8, 8]
             });
 
+            const marker = L.marker([coords[1], coords[0]], { icon: icon });
             marker.bindPopup(createStopPopup(props));
 
-            marker.addTo(state.map);
+            clusterGroup.addLayer(marker);
             state.stopMarkers.push({
                 marker: marker,
                 data: props
             });
         });
+
+        state.stopClusterGroup = clusterGroup;
+        state.map.addLayer(clusterGroup);
     }
 
     /**
      * Create popup content for a route
      */
     function createRoutePopup(props) {
-        const typeLabel = props.type === 'trolleybus' ? 'Тролейбус' : 'Автобус';
+        const typeLabel = props.type === 'trolleybus' ? t('trolleybus') : t('bus');
         const badgeClass = props.type === 'trolleybus' ? 'trolleybus' : 'bus';
 
         const container = document.createElement('div');
@@ -315,12 +352,10 @@
 
         const subtitle = document.createElement('div');
         subtitle.className = 'popup-subtitle';
-        subtitle.textContent = 'Линии и ориентировъчно време:';
-        subtitle.style.cssText = 'font-size: 0.75rem; color: #64748b; margin: 4px 0 8px;';
+        subtitle.textContent = t('lines_arrival');
 
         const linesDiv = document.createElement('div');
         linesDiv.className = 'popup-lines-arrivals';
-        linesDiv.style.cssText = 'display: flex; flex-direction: column; gap: 6px;';
 
         props.lines.forEach(lineId => {
             const isTrolley = lineId.startsWith('T');
@@ -329,13 +364,12 @@
 
             const lineRow = document.createElement('div');
             lineRow.className = 'popup-line-row';
-            lineRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px;';
 
             const badge = document.createElement('span');
             badge.className = 'popup-line-badge ' + (isTrolley ? 'trolleybus' : 'bus');
             badge.textContent = line.number;
-            badge.style.cssText = 'cursor: pointer;';
-            badge.title = 'Кликни за детайли';
+            badge.style.cursor = 'pointer';
+            badge.title = t('click_details');
             badge.addEventListener('click', (e) => {
                 e.stopPropagation();
                 selectLine(lineId);
@@ -343,15 +377,13 @@
 
             const arrivalInfo = document.createElement('span');
             arrivalInfo.className = 'arrival-info';
-            arrivalInfo.style.cssText = 'font-size: 0.75rem; color: #059669; font-weight: 500;';
 
             const arrival = TRANSIT_DATA.calculateEstimatedArrival(lineId, props.id);
             arrivalInfo.textContent = arrival.message;
             if (!arrival.available) {
-                arrivalInfo.style.color = '#dc2626';
+                arrivalInfo.classList.add('not-available');
             } else if (arrival.minutesUntil <= 3) {
-                arrivalInfo.style.color = '#059669';
-                arrivalInfo.style.fontWeight = '700';
+                arrivalInfo.classList.add('arriving-soon');
             }
 
             lineRow.appendChild(badge);
@@ -371,6 +403,16 @@
      */
     function populateLinesList() {
         elements.linesList.textContent = '';
+
+        // Create stop search results container once
+        if (!elements.stopSearchResults) {
+            const container = document.createElement('div');
+            container.id = 'stopSearchResults';
+            container.className = 'stop-search-results';
+            container.style.display = 'none';
+            elements.linesList.parentNode.insertBefore(container, elements.linesList);
+            elements.stopSearchResults = container;
+        }
 
         const trolleyGroup = createLineGroup('trolleybus', 'Тролейбуси', TRANSIT_DATA.getTrolleybusLines());
         elements.linesList.appendChild(trolleyGroup);
@@ -486,24 +528,50 @@
      * Show line details in sidebar
      */
     function showLineDetails(lineId) {
-        const line = TRANSIT_DATA.getLine(lineId);
+        let line = TRANSIT_DATA.getLine(lineId);
+        let isCached = false;
+
+        // Fallback to cached data when offline
+        if (!line && !navigator.onLine) {
+            const cached = getCachedLine(lineId);
+            if (cached) {
+                line = cached;
+                isCached = true;
+            }
+        }
         if (!line) return;
 
+        // Cache for offline use
+        if (!isCached) {
+            cacheLineForOffline(lineId);
+        }
+
         const badgeClass = line.type === 'trolleybus' ? 'trolleybus' : 'bus';
-        const typeLabel = line.type === 'trolleybus' ? 'Тролейбус' : 'Автобус';
+        const typeLabel = line.type === 'trolleybus' ? t('trolleybus') : t('bus');
 
         const detailBadge = document.getElementById('detailBadge');
         detailBadge.textContent = line.number;
         detailBadge.className = 'line-badge ' + badgeClass;
 
         document.getElementById('detailName').textContent = line.name;
-        document.getElementById('detailType').textContent = typeLabel;
+        const detailTypeEl = document.getElementById('detailType');
+        detailTypeEl.textContent = typeLabel;
+
+        // Show cached badge
+        const existingBadge = detailTypeEl.parentNode.querySelector('.cached-badge');
+        if (existingBadge) existingBadge.remove();
+        if (isCached) {
+            const cachedBadge = document.createElement('span');
+            cachedBadge.className = 'cached-badge';
+            cachedBadge.textContent = t('cached');
+            detailTypeEl.parentNode.appendChild(cachedBadge);
+        }
 
         const routeContainer = document.getElementById('detailRoute');
         routeContainer.textContent = '';
 
-        // Get stops with full data using the new helper
-        const lineStops = TRANSIT_DATA.getLineStops(lineId);
+        // Get stops - use cached data if available
+        const lineStops = isCached && line.stopsData ? line.stopsData : TRANSIT_DATA.getLineStops(lineId);
         lineStops.forEach(stop => {
             const stopEl = document.createElement('div');
             stopEl.className = 'route-stop';
@@ -527,7 +595,7 @@
             const weekdayRow = document.createElement('div');
             weekdayRow.className = 'schedule-row';
             const weekdayLabel = document.createElement('span');
-            weekdayLabel.textContent = 'Делник:';
+            weekdayLabel.textContent = t('weekday');
             const weekdayValue = document.createElement('span');
             weekdayValue.textContent = line.schedule.weekday.first + ' - ' + line.schedule.weekday.last;
             weekdayRow.appendChild(weekdayLabel);
@@ -537,7 +605,7 @@
             const freqRow = document.createElement('div');
             freqRow.className = 'schedule-row';
             const freqLabel = document.createElement('span');
-            freqLabel.textContent = 'Интервал:';
+            freqLabel.textContent = t('interval');
             const freqValue = document.createElement('span');
             freqValue.textContent = line.schedule.weekday.frequency;
             freqRow.appendChild(freqLabel);
@@ -548,7 +616,7 @@
                 const weekendRow = document.createElement('div');
                 weekendRow.className = 'schedule-row';
                 const weekendLabel = document.createElement('span');
-                weekendLabel.textContent = 'Почивен ден:';
+                weekendLabel.textContent = t('weekend');
                 const weekendValue = document.createElement('span');
                 weekendValue.textContent = line.schedule.weekend.first + ' - ' + line.schedule.weekend.last;
                 weekendRow.appendChild(weekendLabel);
@@ -589,6 +657,30 @@
         elements.linesList.querySelectorAll('.line-item').forEach(item => {
             item.classList.remove('active');
         });
+
+        // Re-apply current filter (preserves favorites, type filters, etc.)
+        if (state.activeFilter === 'favorites') {
+            filterFavorites();
+        } else {
+            filterLines(state.activeFilter);
+        }
+    }
+
+    /**
+     * Read ?filter= from URL and apply
+     */
+    function initFilterFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const filter = params.get('filter');
+        if (filter && ['all', 'trolleybus', 'bus', 'favorites'].includes(filter)) {
+            if (filter === 'favorites') {
+                state.activeFilter = 'favorites';
+                elements.filterTabs.forEach(t => t.classList.toggle('active', t.dataset.filter === 'favorites'));
+                filterFavorites();
+            } else {
+                filterLines(filter);
+            }
+        }
     }
 
     /**
@@ -597,9 +689,21 @@
     function filterLines(filterType) {
         state.activeFilter = filterType;
 
+        // Persist filter in URL
+        const url = new URL(window.location);
+        if (filterType === 'all') {
+            url.searchParams.delete('filter');
+        } else {
+            url.searchParams.set('filter', filterType);
+        }
+        history.replaceState(null, '', url);
+
         elements.filterTabs.forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.filter === filterType);
+            const isActive = tab.dataset.filter === filterType;
+            tab.classList.toggle('active', isActive);
+            tab.setAttribute('aria-selected', isActive);
         });
+        elements.linesList.setAttribute('aria-labelledby', 'tab-' + filterType);
 
         elements.linesList.querySelectorAll('.line-group').forEach(group => {
             const groupType = group.dataset.type;
@@ -629,16 +733,8 @@
     function searchLines(query) {
         const normalizedQuery = query.toLowerCase().trim();
 
-        let stopResultsContainer = document.getElementById('stopSearchResults');
-        if (!stopResultsContainer) {
-            stopResultsContainer = document.createElement('div');
-            stopResultsContainer.id = 'stopSearchResults';
-            stopResultsContainer.className = 'stop-search-results';
-            elements.linesList.parentNode.insertBefore(stopResultsContainer, elements.linesList);
-        }
-
-        stopResultsContainer.textContent = '';
-        stopResultsContainer.style.display = 'none';
+        elements.stopSearchResults.textContent = '';
+        elements.stopSearchResults.style.display = 'none';
 
         if (normalizedQuery === '') {
             elements.linesList.querySelectorAll('.line-item').forEach(item => {
@@ -654,17 +750,16 @@
         const matchingStops = TRANSIT_DATA.searchStops(normalizedQuery);
 
         if (matchingStops.length > 0) {
-            stopResultsContainer.style.display = 'block';
+            elements.stopSearchResults.style.display = 'block';
 
             const title = document.createElement('div');
             title.className = 'stop-results-title';
-            title.textContent = 'Спирки:';
-            title.style.cssText = 'font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 0.875rem;';
-            stopResultsContainer.appendChild(title);
+            title.textContent = t('stops_results');
+            elements.stopSearchResults.appendChild(title);
 
             matchingStops.forEach(stop => {
                 const stopCard = createStopSearchResult(stop);
-                stopResultsContainer.appendChild(stopCard);
+                elements.stopSearchResults.appendChild(stopCard);
             });
         }
 
@@ -699,11 +794,9 @@
     function createStopSearchResult(stop) {
         const card = document.createElement('div');
         card.className = 'stop-search-card';
-        card.style.cssText = 'background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 8px; cursor: pointer;';
 
         const header = document.createElement('div');
         header.className = 'stop-card-header';
-        header.style.cssText = 'font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;';
 
         const icon = document.createElement('span');
         icon.textContent = '\ud83d\udccd';
@@ -717,7 +810,6 @@
 
         const linesContainer = document.createElement('div');
         linesContainer.className = 'stop-lines-container';
-        linesContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px;';
 
         stop.lines.forEach(lineId => {
             const line = TRANSIT_DATA.getLine(lineId);
@@ -726,23 +818,21 @@
             const isTrolley = lineId.startsWith('T');
             const lineRow = document.createElement('div');
             lineRow.className = 'stop-line-row';
-            lineRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 4px 0;';
 
             const lineInfo = document.createElement('div');
-            lineInfo.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+            lineInfo.className = 'stop-line-info';
 
             const badge = document.createElement('span');
-            badge.className = 'line-badge ' + (isTrolley ? 'trolleybus' : 'bus');
+            badge.className = 'line-badge stop-line-badge-small ' + (isTrolley ? 'trolleybus' : 'bus');
             badge.textContent = line.number;
-            badge.style.cssText = 'cursor: pointer; font-size: 0.75rem; padding: 2px 6px;';
             badge.addEventListener('click', (e) => {
                 e.stopPropagation();
                 selectLine(lineId);
             });
 
             const routeName = document.createElement('span');
+            routeName.className = 'stop-line-route-name';
             routeName.textContent = line.route;
-            routeName.style.cssText = 'font-size: 0.75rem; color: #64748b; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
 
             lineInfo.appendChild(badge);
             lineInfo.appendChild(routeName);
@@ -754,11 +844,11 @@
             arrivalTime.textContent = arrival.message;
 
             if (!arrival.available) {
-                arrivalTime.style.cssText = 'font-size: 0.75rem; color: #dc2626; font-weight: 500;';
+                arrivalTime.classList.add('not-running');
             } else if (arrival.minutesUntil <= 3) {
-                arrivalTime.style.cssText = 'font-size: 0.75rem; color: #059669; font-weight: 700;';
+                arrivalTime.classList.add('arriving-soon');
             } else {
-                arrivalTime.style.cssText = 'font-size: 0.75rem; color: #059669; font-weight: 500;';
+                arrivalTime.classList.add('running');
             }
 
             lineRow.appendChild(lineInfo);
@@ -812,6 +902,11 @@
                     const { latitude, longitude } = position.coords;
                     state.map.setView([latitude, longitude], 16);
 
+                    // Remove previous location marker if exists
+                    if (state.userLocationMarker) {
+                        state.map.removeLayer(state.userLocationMarker);
+                    }
+
                     const markerIcon = L.divIcon({
                         className: 'user-location-marker',
                         html: '<div style="width: 16px; height: 16px; background: #2563eb; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>',
@@ -819,30 +914,30 @@
                         iconAnchor: [8, 8]
                     });
 
-                    L.marker([latitude, longitude], { icon: markerIcon })
+                    state.userLocationMarker = L.marker([latitude, longitude], { icon: markerIcon })
                         .addTo(state.map)
-                        .bindPopup('Вашата локация')
+                        .bindPopup(t('your_location'))
                         .openPopup();
                 },
                 error => {
-                    let message = 'Не може да се определи локацията.';
+                    let message = t('location_error');
                     switch (error.code) {
                         case error.PERMISSION_DENIED:
-                            message = 'Достъпът до местоположението е отказан.';
+                            message = t('location_denied');
                             break;
                         case error.POSITION_UNAVAILABLE:
-                            message = 'Информацията за местоположението не е достъпна.';
+                            message = t('location_unavailable');
                             break;
                         case error.TIMEOUT:
-                            message = 'Заявката за местоположение изтече.';
+                            message = t('location_timeout');
                             break;
                     }
-                    showToast(message);
+                    showGeolocationError(message, locateUser);
                 },
                 { enableHighAccuracy: true, timeout: TIMING.GEOLOCATION_TIMEOUT }
             );
         } else {
-            showToast('Браузърът не поддържа геолокация.');
+            showGeolocationError(t('not_supported'), null);
         }
     }
 
@@ -852,6 +947,10 @@
     function resetMapView() {
         state.map.setView(TRANSIT_DATA.center, TRANSIT_DATA.defaultZoom);
         hideLineDetails();
+        state.activeFilter = 'all';
+        elements.filterTabs.forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.filter === 'all');
+        });
         filterLines('all');
         elements.searchInput.value = '';
         elements.searchClear.classList.remove('visible');
@@ -872,17 +971,79 @@
     // ================================
     // Dark Mode
     // ================================
-    function initDarkMode() {
-        if (state.darkMode) {
-            document.documentElement.setAttribute('data-theme', 'dark');
+    function updateThemeColor(isDark) {
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) {
+            meta.setAttribute('content', isDark ? '#1e293b' : '#2563eb');
         }
+    }
+
+    function initDarkMode() {
+        const saved = safeGetItem('darkMode', null);
+        if (saved === null) {
+            // No saved preference - detect OS preference
+            state.darkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+        document.documentElement.setAttribute('data-theme', state.darkMode ? 'dark' : 'light');
+        updateThemeColor(state.darkMode);
     }
 
     function toggleDarkMode() {
         state.darkMode = !state.darkMode;
         safeSetItem('darkMode', state.darkMode);
         document.documentElement.setAttribute('data-theme', state.darkMode ? 'dark' : 'light');
-        showToast(state.darkMode ? 'Тъмен режим включен' : 'Светъл режим включен');
+        updateThemeColor(state.darkMode);
+        showToast(state.darkMode ? t('dark_mode_on') : t('light_mode_on'));
+    }
+
+    // ================================
+    // Geolocation Error Banner
+    // ================================
+    function showGeolocationError(message, retryFn) {
+        // Remove existing banner
+        const existing = document.querySelector('.geo-error-banner');
+        if (existing) existing.remove();
+
+        const banner = document.createElement('div');
+        banner.className = 'geo-error-banner';
+        banner.setAttribute('role', 'alert');
+
+        const text = document.createElement('span');
+        text.className = 'geo-error-text';
+        text.textContent = message;
+
+        const actions = document.createElement('div');
+        actions.className = 'geo-error-actions';
+
+        if (retryFn) {
+            const retryBtn = document.createElement('button');
+            retryBtn.className = 'geo-error-retry';
+            retryBtn.textContent = '↻';
+            retryBtn.addEventListener('click', () => {
+                banner.remove();
+                retryFn();
+            });
+            actions.appendChild(retryBtn);
+        }
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'geo-error-close';
+        closeBtn.textContent = '×';
+        closeBtn.addEventListener('click', () => banner.remove());
+        actions.appendChild(closeBtn);
+
+        banner.appendChild(text);
+        banner.appendChild(actions);
+
+        const mapContainer = document.querySelector('.map-container');
+        if (mapContainer) {
+            mapContainer.insertBefore(banner, mapContainer.firstChild);
+        }
+
+        // Auto-dismiss after 10s
+        setTimeout(() => {
+            if (banner.parentNode) banner.remove();
+        }, 10000);
     }
 
     // ================================
@@ -918,7 +1079,7 @@
             if (elements.installPrompt) {
                 elements.installPrompt.classList.remove('visible');
             }
-            showToast('Приложението е инсталирано!');
+            showToast(t('app_installed'));
         });
     }
 
@@ -973,10 +1134,10 @@
         const index = state.favorites.lines.indexOf(lineId);
         if (index > -1) {
             state.favorites.lines.splice(index, 1);
-            showToast('Премахнато от любими');
+            showToast(t('removed_from_favorites'));
         } else {
             state.favorites.lines.push(lineId);
-            showToast('Добавено в любими');
+            showToast(t('added_to_favorites'));
         }
         saveFavorites();
         updateFavoriteButton();
@@ -992,10 +1153,10 @@
         const index = state.favorites.stops.indexOf(stopId);
         if (index > -1) {
             state.favorites.stops.splice(index, 1);
-            showToast('Спирката е премахната от любими');
+            showToast(t('stop_removed_fav'));
         } else {
             state.favorites.stops.push(stopId);
-            showToast('Спирката е добавена в любими');
+            showToast(t('stop_added_fav'));
         }
         saveFavorites();
     }
@@ -1009,7 +1170,7 @@
 
     function filterFavorites() {
         if (state.favorites.lines.length === 0) {
-            showToast('Нямате любими линии');
+            showToast(t('no_favorites'));
             return;
         }
 
@@ -1059,12 +1220,13 @@
         // Use textContent for safer rendering
         const loadingP = document.createElement('p');
         loadingP.className = 'nearby-loading';
-        loadingP.textContent = 'Определяне на локация...';
+        loadingP.textContent = t('determining_location');
         elements.nearbyContent.textContent = '';
         elements.nearbyContent.appendChild(loadingP);
 
         if (!('geolocation' in navigator)) {
-            loadingP.textContent = 'Геолокацията не се поддържа';
+            loadingP.textContent = t('geolocation_not_supported');
+            showGeolocationError(t('geolocation_not_supported'), null);
             return;
         }
 
@@ -1077,11 +1239,12 @@
                 displayNearbyStops();
             },
             (error) => {
-                let message = 'Неуспешно определяне на локацията';
+                let message = t('location_failed');
                 if (error.code === error.PERMISSION_DENIED) {
-                    message = 'Достъпът до местоположението е отказан';
+                    message = t('location_denied');
                 }
                 loadingP.textContent = message;
+                showGeolocationError(message, findNearbyStops);
             },
             { enableHighAccuracy: true, timeout: TIMING.GEOLOCATION_TIMEOUT }
         );
@@ -1146,9 +1309,8 @@
                 if (!line) return;
 
                 const badge = document.createElement('span');
-                badge.className = `line-badge ${line.type}`;
+                badge.className = `line-badge stop-line-badge-small ${line.type}`;
                 badge.textContent = line.number;
-                badge.style.cssText = 'min-width: 28px; height: 22px; font-size: 0.75rem; padding: 0 6px; cursor: pointer;';
                 badge.setAttribute('role', 'button');
                 badge.setAttribute('aria-label', `Линия ${line.number}`);
                 badge.addEventListener('click', (e) => {
@@ -1173,8 +1335,223 @@
                 }
             });
 
+            // Walk button
+            const walkBtn = document.createElement('button');
+            walkBtn.className = 'walk-btn';
+            walkBtn.textContent = t('walk');
+            walkBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showWalkingDirection(stop);
+            });
+            card.appendChild(walkBtn);
+
             elements.nearbyContent.appendChild(card);
         });
+    }
+
+    function showWalkingDirection(stop) {
+        if (!state.userLocation) return;
+
+        // Remove previous walking line
+        if (state.walkingLine) {
+            state.map.removeLayer(state.walkingLine);
+        }
+
+        const from = [state.userLocation.lat, state.userLocation.lng];
+        const to = [stop.lat, stop.lng];
+
+        state.walkingLine = L.polyline([from, to], {
+            color: '#2563eb',
+            weight: 4,
+            opacity: 0.7,
+            dashArray: '8, 8'
+        }).addTo(state.map);
+
+        // Walking speed ~83m/min (5 km/h)
+        const walkMinutes = Math.ceil(stop.distance / 83);
+        state.walkingLine.bindPopup(t('walking_time', { min: walkMinutes })).openPopup();
+
+        state.map.fitBounds(L.latLngBounds([from, to]), { padding: [60, 60] });
+
+        closeNearbyPanel();
+        if (window.innerWidth <= 768) {
+            closeSidebar();
+        }
+    }
+
+    // ================================
+    // Route Planner
+    // ================================
+    function toggleRoutePlannerPanel() {
+        state.routePlannerOpen = !state.routePlannerOpen;
+        if (elements.routePlannerPanel) {
+            elements.routePlannerPanel.classList.toggle('active', state.routePlannerOpen);
+        }
+        if (elements.routePlannerBtn) {
+            elements.routePlannerBtn.classList.toggle('active', state.routePlannerOpen);
+        }
+        if (state.routePlannerOpen && elements.routeFrom) {
+            elements.routeFrom.focus();
+        }
+    }
+
+    function closeRoutePlannerPanel() {
+        state.routePlannerOpen = false;
+        if (elements.routePlannerPanel) {
+            elements.routePlannerPanel.classList.remove('active');
+        }
+        if (elements.routePlannerBtn) {
+            elements.routePlannerBtn.classList.remove('active');
+        }
+        clearRoutePlannerLayers();
+    }
+
+    function setupRouteAutocomplete(inputEl, suggestionsEl, onSelect) {
+        if (!inputEl || !suggestionsEl) return;
+
+        const debouncedSuggest = debounce((query) => {
+            suggestionsEl.textContent = '';
+            if (query.length < 2) {
+                suggestionsEl.style.display = 'none';
+                return;
+            }
+            const stops = TRANSIT_DATA.searchStops(query).slice(0, 6);
+            if (stops.length === 0) {
+                suggestionsEl.style.display = 'none';
+                return;
+            }
+            suggestionsEl.style.display = 'block';
+            stops.forEach(stop => {
+                const item = document.createElement('div');
+                item.className = 'route-suggestion-item';
+                item.textContent = stop.name;
+                item.addEventListener('click', () => {
+                    inputEl.value = stop.name;
+                    suggestionsEl.style.display = 'none';
+                    onSelect(stop.id);
+                });
+                suggestionsEl.appendChild(item);
+            });
+        }, 200);
+
+        inputEl.addEventListener('input', (e) => debouncedSuggest(e.target.value));
+        inputEl.addEventListener('blur', () => {
+            setTimeout(() => { suggestionsEl.style.display = 'none'; }, 200);
+        });
+    }
+
+    function searchRoute() {
+        if (!state.routeFromStopId || !state.routeToStopId) {
+            showToast(t('select_stops'));
+            return;
+        }
+        if (typeof RoutePlanner === 'undefined') return;
+
+        const routes = RoutePlanner.findRoutes(state.routeFromStopId, state.routeToStopId);
+        displayRouteResults(routes);
+    }
+
+    function displayRouteResults(routes) {
+        if (!elements.routeResults) return;
+        elements.routeResults.textContent = '';
+        clearRoutePlannerLayers();
+
+        if (routes.length === 0) {
+            const noResults = document.createElement('p');
+            noResults.className = 'route-no-results';
+            noResults.textContent = t('no_route_found');
+            elements.routeResults.appendChild(noResults);
+            return;
+        }
+
+        routes.forEach((route, idx) => {
+            const card = document.createElement('div');
+            card.className = 'route-result-card';
+
+            const header = document.createElement('div');
+            header.className = 'route-result-header';
+
+            const badges = document.createElement('div');
+            badges.className = 'route-result-badges';
+            route.segments.forEach((seg, i) => {
+                if (i > 0) {
+                    const arrow = document.createElement('span');
+                    arrow.className = 'route-transfer-arrow';
+                    arrow.textContent = '→';
+                    badges.appendChild(arrow);
+                }
+                const line = TRANSIT_DATA.getLine(seg.lineId);
+                if (line) {
+                    const badge = document.createElement('span');
+                    badge.className = 'line-badge ' + (line.type === 'trolleybus' ? 'trolleybus' : 'bus');
+                    badge.textContent = line.number;
+                    badges.appendChild(badge);
+                }
+            });
+
+            const meta = document.createElement('div');
+            meta.className = 'route-result-meta';
+            const time = RoutePlanner.estimateTime(route);
+            meta.textContent = `~${time} мин · ${route.totalStops} спирки` +
+                (route.transfers > 0 ? ` · ${route.transfers} пресядан${route.transfers === 1 ? 'е' : 'ия'}` : '');
+
+            header.appendChild(badges);
+            header.appendChild(meta);
+            card.appendChild(header);
+
+            // Segment details
+            route.segments.forEach(seg => {
+                const segEl = document.createElement('div');
+                segEl.className = 'route-segment';
+                const line = TRANSIT_DATA.getLine(seg.lineId);
+                const fromStop = TRANSIT_DATA.getStop(seg.stops[0]);
+                const toStop = TRANSIT_DATA.getStop(seg.stops[seg.stops.length - 1]);
+                if (line && fromStop && toStop) {
+                    segEl.textContent = `${line.number}: ${fromStop.name} → ${toStop.name} (${seg.stops.length - 1} спирки)`;
+                }
+                card.appendChild(segEl);
+            });
+
+            card.addEventListener('click', () => drawRouteOnMap(route));
+            card.setAttribute('role', 'button');
+            card.setAttribute('tabindex', '0');
+            elements.routeResults.appendChild(card);
+        });
+    }
+
+    function drawRouteOnMap(route) {
+        clearRoutePlannerLayers();
+
+        const allCoords = [];
+        const colors = ['#2563eb', '#dc2626', '#059669'];
+
+        route.segments.forEach((seg, i) => {
+            const segCoords = [];
+            seg.stops.forEach(stopId => {
+                const stop = TRANSIT_DATA.getStop(stopId);
+                if (stop) segCoords.push([stop.lat, stop.lng]);
+            });
+
+            if (segCoords.length > 1) {
+                const polyline = L.polyline(segCoords, {
+                    color: colors[i % colors.length],
+                    weight: 6,
+                    opacity: 0.8,
+                    dashArray: i > 0 ? '10, 8' : null
+                }).addTo(state.map);
+                state.routePlannerLayers.push(polyline);
+                allCoords.push(...segCoords);
+            }
+        });
+
+        if (allCoords.length > 0) {
+            state.map.fitBounds(L.latLngBounds(allCoords), { padding: [50, 50] });
+        }
+    }
+
+    function clearRoutePlannerLayers() {
+        state.routePlannerLayers.forEach(layer => state.map.removeLayer(layer));
+        state.routePlannerLayers = [];
     }
 
     // ================================
@@ -1213,7 +1590,7 @@
     function updateUrl(type, id) {
         const newHash = `#${type}/${id}`;
         if (window.location.hash !== newHash) {
-            history.pushState(null, '', newHash);
+            history.replaceState(null, '', newHash);
         }
     }
 
@@ -1231,16 +1608,48 @@
             }).catch((error) => {
                 // Only show error if not user cancellation
                 if (error.name !== 'AbortError') {
-                    showToast('Споделянето не успя');
+                    showToast(t('share_failed'));
                 }
             });
         } else {
             navigator.clipboard.writeText(url).then(() => {
-                showToast('Линкът е копиран');
+                showToast(t('link_copied'));
             }).catch(() => {
-                showToast('Неуспешно копиране');
+                showToast(t('copy_failed'));
             });
         }
+    }
+
+    // ================================
+    // Enhanced Offline (Line Caching)
+    // ================================
+    function cacheLineForOffline(lineId) {
+        const line = TRANSIT_DATA.getLine(lineId);
+        if (!line) return;
+
+        const cached = safeGetJSON('cachedLines', {});
+        const lineStops = TRANSIT_DATA.getLineStops(lineId);
+
+        cached[lineId] = {
+            ...line,
+            id: lineId,
+            stopsData: lineStops,
+            cachedAt: Date.now()
+        };
+
+        // Keep only last 10
+        const keys = Object.keys(cached);
+        if (keys.length > 10) {
+            const sorted = keys.sort((a, b) => cached[a].cachedAt - cached[b].cachedAt);
+            delete cached[sorted[0]];
+        }
+
+        safeSetItem('cachedLines', JSON.stringify(cached));
+    }
+
+    function getCachedLine(lineId) {
+        const cached = safeGetJSON('cachedLines', {});
+        return cached[lineId] || null;
     }
 
     // ================================
@@ -1268,6 +1677,18 @@
     // Keyboard Shortcuts
     // ================================
     function handleKeyboardShortcuts(e) {
+        // Focus trap for open modals
+        if (e.key === 'Tab') {
+            if (elements.shortcutsModal.classList.contains('active')) {
+                trapFocus(elements.shortcutsModal, e);
+                return;
+            }
+            if (elements.infoModal.classList.contains('active')) {
+                trapFocus(elements.infoModal, e);
+                return;
+            }
+        }
+
         // Ignore if typing in input
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
             if (e.key === 'Escape') {
@@ -1289,6 +1710,8 @@
                     elements.shortcutsModal.classList.remove('active');
                 } else if (elements.infoModal.classList.contains('active')) {
                     elements.infoModal.classList.remove('active');
+                } else if (state.routePlannerOpen) {
+                    closeRoutePlannerPanel();
                 } else if (state.nearbyPanelOpen) {
                     closeNearbyPanel();
                 } else if (state.selectedLine) {
@@ -1305,6 +1728,12 @@
                     toggleFavoriteLine(state.selectedLine);
                 } else {
                     filterFavorites();
+                }
+                break;
+            case 'p':
+                toggleRoutePlannerPanel();
+                if (window.innerWidth <= 768 && !state.sidebarOpen) {
+                    toggleSidebar();
                 }
                 break;
             case 'n':
@@ -1327,6 +1756,25 @@
 
     function showShortcutsModal() {
         elements.shortcutsModal.classList.add('active');
+    }
+
+    /**
+     * Trap focus inside a modal element
+     */
+    function trapFocus(modal, e) {
+        const focusable = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+        }
     }
 
     /**
@@ -1396,6 +1844,25 @@
         // Keyboard shortcuts
         document.addEventListener('keydown', handleKeyboardShortcuts);
 
+        // Language toggle
+        const langToggle = document.getElementById('langToggle');
+        if (langToggle && typeof I18n !== 'undefined') {
+            langToggle.addEventListener('click', () => {
+                const next = I18n.getLanguage() === 'bg' ? 'en' : 'bg';
+                I18n.setLanguage(next);
+                langToggle.querySelector('.lang-label').textContent = next === 'bg' ? 'EN' : 'BG';
+            });
+            // Set initial label
+            langToggle.querySelector('.lang-label').textContent = I18n.getLanguage() === 'bg' ? 'EN' : 'BG';
+        }
+
+        // Listen for language changes to re-render dynamic content
+        window.addEventListener('languageChanged', () => {
+            // Re-render sidebar line groups
+            populateLinesList();
+            initFilterFromUrl();
+        });
+
         // Dark mode toggle
         if (elements.darkModeToggle) {
             elements.darkModeToggle.addEventListener('click', toggleDarkMode);
@@ -1446,6 +1913,29 @@
             elements.shareLineBtn.addEventListener('click', shareCurrentLine);
         }
 
+        // Route planner
+        if (elements.routePlannerBtn) {
+            elements.routePlannerBtn.addEventListener('click', toggleRoutePlannerPanel);
+        }
+        if (elements.routePlannerClose) {
+            elements.routePlannerClose.addEventListener('click', closeRoutePlannerPanel);
+        }
+        if (elements.routeSwapBtn) {
+            elements.routeSwapBtn.addEventListener('click', () => {
+                const tmp = elements.routeFrom.value;
+                elements.routeFrom.value = elements.routeTo.value;
+                elements.routeTo.value = tmp;
+                const tmpId = state.routeFromStopId;
+                state.routeFromStopId = state.routeToStopId;
+                state.routeToStopId = tmpId;
+            });
+        }
+        if (elements.routeSearchBtn) {
+            elements.routeSearchBtn.addEventListener('click', searchRoute);
+        }
+        setupRouteAutocomplete(elements.routeFrom, elements.routeFromSuggestions, (id) => { state.routeFromStopId = id; });
+        setupRouteAutocomplete(elements.routeTo, elements.routeToSuggestions, (id) => { state.routeToStopId = id; });
+
         // Shortcuts modal
         if (elements.shortcutsClose) {
             elements.shortcutsClose.addEventListener('click', () => {
@@ -1458,6 +1948,12 @@
      * Initialize the application
      */
     function init() {
+        // Check for required dependencies
+        if (typeof L === 'undefined') {
+            showErrorState('Библиотеката за карти не е заредена. Моля, опреснете страницата.');
+            return;
+        }
+
         // Check for required data
         if (typeof TRANSIT_DATA === 'undefined') {
             showErrorState('Данните за транспорта не са заредени. Моля, опреснете страницата.');
@@ -1480,15 +1976,21 @@
         }
 
         // Initialize features
+        if (typeof I18n !== 'undefined') {
+            I18n.initLanguage();
+        }
         initDarkMode();
         initInstallPrompt();
 
-        initMap();
-        populateLinesList();
-        initEventListeners();
+        // initMap is async (loads route geometries)
+        initMap().then(() => {
+            // Deep linking needs routes on map for fitBounds
+            initDeepLinking();
+        });
 
-        // Handle deep linking after map is ready
-        initDeepLinking();
+        populateLinesList();
+        initFilterFromUrl();
+        initEventListeners();
     }
 
     /**

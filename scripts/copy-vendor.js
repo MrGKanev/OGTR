@@ -14,6 +14,14 @@ const vendors = [
       { src: 'leaflet/dist/leaflet.css', dest: 'leaflet/leaflet.css' },
       { src: 'leaflet/dist/images', dest: 'leaflet/images', isDir: true }
     ]
+  },
+  {
+    name: 'leaflet-markercluster',
+    files: [
+      { src: 'leaflet.markercluster/dist/leaflet.markercluster.js', dest: 'leaflet-markercluster/leaflet.markercluster.js' },
+      { src: 'leaflet.markercluster/dist/MarkerCluster.css', dest: 'leaflet-markercluster/MarkerCluster.css' },
+      { src: 'leaflet.markercluster/dist/MarkerCluster.Default.css', dest: 'leaflet-markercluster/MarkerCluster.Default.css' }
+    ]
   }
 ];
 

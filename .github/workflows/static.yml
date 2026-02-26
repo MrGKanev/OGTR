@@ -33,6 +33,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Pages
         uses: actions/configure-pages@v5
+      - name: Bump SW cache version
+        run: |
+          TIMESTAMP=$(date +%s)
+          BUILD_DATE=$(date +%Y-%m-%d)
+          sed -i "s/const CACHE_VERSION = [0-9]*/const CACHE_VERSION = $TIMESTAMP/" sw.js
+          sed -i "s/const BUILD_DATE = '[^']*'/const BUILD_DATE = '$BUILD_DATE'/" sw.js
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

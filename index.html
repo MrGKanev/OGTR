@@ -75,15 +75,24 @@
     }
     </script>
 
+    <!-- Preload critical resources -->
+    <link rel="preload" href="vendor/leaflet/leaflet.js" as="script">
+    <link rel="preload" href="js/data-normalized.js" as="script">
+    <link rel="preload" href="js/app.js" as="script">
+    <link rel="preload" href="data/route-geometries.json" as="fetch" crossorigin>
+    <link rel="preconnect" href="https://tile.openstreetmap.org">
+
     <!-- Leaflet CSS (local) -->
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+    <link rel="stylesheet" href="vendor/leaflet-markercluster/MarkerCluster.css">
+    <link rel="stylesheet" href="vendor/leaflet-markercluster/MarkerCluster.Default.css">
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/style.css">
 
     <!-- Favicon & Icons -->
     <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
-    <link rel="apple-touch-icon" href="icons/icon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180x180.png">
 
     <!-- PWA -->
     <link rel="manifest" href="manifest.json">
@@ -94,14 +103,25 @@
     <meta name="mobile-web-app-capable" content="yes">
 </head>
 <body>
+    <a href="#map" class="skip-link" data-i18n="skip_to_map">Прескочи към картата</a>
+    <noscript>
+        <div style="padding: 2rem; text-align: center; font-family: sans-serif;">
+            <h1>Градски транспорт Русе</h1>
+            <p>Това приложение изисква JavaScript. Моля, активирайте JavaScript в браузъра си.</p>
+        </div>
+    </noscript>
+
     <!-- Header -->
     <header class="header">
         <div class="header-content">
             <h1 class="logo">
                 <span class="logo-icon">🚍</span>
-                <span class="logo-text">Транспорт Русе</span>
+                <span class="logo-text" data-i18n="app.title">Транспорт Русе</span>
             </h1>
             <div class="header-actions">
+                <button class="header-btn" id="langToggle" aria-label="Language" title="BG / EN">
+                    <span class="lang-label">EN</span>
+                </button>
                 <button class="header-btn" id="darkModeToggle" aria-label="Тъмен режим" title="Тъмен режим (D)">
                     <span class="icon-light">🌙</span>
                     <span class="icon-dark">☀️</span>
@@ -139,28 +159,56 @@
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="sidebar-title-row">
-                    <h2>Линии</h2>
+                    <h2 data-i18n="lines">Линии</h2>
                     <div class="sidebar-actions">
-                        <button class="sidebar-action-btn" id="nearbyBtn" title="Най-близки спирки (N)">
-                            <span>📍</span>
+                        <button class="sidebar-action-btn" id="routePlannerBtn" title="Планиране на маршрут (P)" aria-label="Планиране на маршрут">
+                            <span aria-hidden="true">🗺️</span>
                         </button>
-                        <button class="sidebar-action-btn" id="favoritesBtn" title="Любими (F)">
-                            <span>⭐</span>
+                        <button class="sidebar-action-btn" id="nearbyBtn" title="Най-близки спирки (N)" aria-label="Най-близки спирки">
+                            <span aria-hidden="true">📍</span>
+                        </button>
+                        <button class="sidebar-action-btn" id="favoritesBtn" title="Любими (F)" aria-label="Любими">
+                            <span aria-hidden="true">⭐</span>
                         </button>
                     </div>
                 </div>
                 <div class="filter-tabs" role="tablist" aria-label="Филтриране на линии">
-                    <button class="filter-tab active" data-filter="all" role="tab" aria-selected="true">Всички</button>
-                    <button class="filter-tab" data-filter="trolleybus" role="tab" aria-selected="false">Тролейбуси</button>
-                    <button class="filter-tab" data-filter="bus" role="tab" aria-selected="false">Автобуси</button>
-                    <button class="filter-tab" data-filter="favorites" role="tab" aria-selected="false" aria-label="Любими линии">⭐</button>
+                    <button class="filter-tab active" data-filter="all" role="tab" aria-selected="true" aria-controls="linesList" id="tab-all" data-i18n="all">Всички</button>
+                    <button class="filter-tab" data-filter="trolleybus" role="tab" aria-selected="false" aria-controls="linesList" id="tab-trolleybus" data-i18n="trolleybuses">Тролейбуси</button>
+                    <button class="filter-tab" data-filter="bus" role="tab" aria-selected="false" aria-controls="linesList" id="tab-bus" data-i18n="buses">Автобуси</button>
+                    <button class="filter-tab" data-filter="favorites" role="tab" aria-selected="false" aria-controls="linesList" id="tab-favorites" aria-label="Любими линии"><span aria-hidden="true">⭐</span></button>
                 </div>
+            </div>
+
+            <!-- Route Planner Panel -->
+            <div class="route-planner-panel" id="routePlannerPanel">
+                <div class="route-planner-header">
+                    <h3>🗺️ Планиране на маршрут</h3>
+                    <button class="nearby-close" id="routePlannerClose">×</button>
+                </div>
+                <div class="route-planner-form">
+                    <div class="route-planner-inputs">
+                        <div class="route-input-group">
+                            <label for="routeFrom">От:</label>
+                            <input type="text" id="routeFrom" placeholder="Начална спирка..." autocomplete="off">
+                            <div class="route-suggestions" id="routeFromSuggestions"></div>
+                        </div>
+                        <button class="route-swap-btn" id="routeSwapBtn" title="Размени" aria-label="Размени начална и крайна спирка">⇅</button>
+                        <div class="route-input-group">
+                            <label for="routeTo">До:</label>
+                            <input type="text" id="routeTo" placeholder="Крайна спирка..." autocomplete="off">
+                            <div class="route-suggestions" id="routeToSuggestions"></div>
+                        </div>
+                    </div>
+                    <button class="route-search-btn" id="routeSearchBtn">Търси маршрут</button>
+                </div>
+                <div class="route-results" id="routeResults"></div>
             </div>
 
             <!-- Nearby Stops Panel -->
             <div class="nearby-panel" id="nearbyPanel">
                 <div class="nearby-header">
-                    <h3>📍 Най-близки спирки</h3>
+                    <h3 data-i18n="nearby_stops">📍 Най-близки спирки</h3>
                     <button class="nearby-close" id="nearbyClose">×</button>
                 </div>
                 <div class="nearby-content" id="nearbyContent">
@@ -170,11 +218,11 @@
 
             <div class="search-box">
                 <span class="search-icon">🔍</span>
-                <input type="text" id="searchInput" placeholder="Търси линия или спирка..." aria-label="Търсене">
+                <input type="text" id="searchInput" placeholder="Търси линия или спирка..." aria-label="Търсене" data-i18n-placeholder="search_placeholder" data-i18n-aria="search_label">
                 <button type="button" class="search-clear" id="searchClear" aria-label="Изчисти търсенето">×</button>
             </div>
 
-            <div class="lines-list" id="linesList">
+            <div class="lines-list" id="linesList" role="tabpanel" aria-labelledby="tab-all">
                 <!-- Lines will be populated by JavaScript -->
             </div>
 
@@ -206,7 +254,7 @@
                     <!-- Route stops will be populated -->
                 </div>
                 <div class="line-schedule" id="detailSchedule">
-                    <h4>Разписание</h4>
+                    <h4 data-i18n="schedule">Разписание</h4>
                     <div class="schedule-content">
                         <!-- Schedule will be populated -->
                     </div>
@@ -221,10 +269,10 @@
             <!-- Map Controls -->
             <div class="map-controls" role="group" aria-label="Контроли на картата">
                 <button class="map-control-btn" id="locateBtn" title="Моята локация" aria-label="Покажи моята локация на картата">
-                    📍
+                    <span aria-hidden="true">📍</span>
                 </button>
                 <button class="map-control-btn" id="resetBtn" title="Покажи целия град" aria-label="Нулирай изгледа на картата">
-                    🔄
+                    <span aria-hidden="true">🔄</span>
                 </button>
             </div>
 
@@ -258,12 +306,12 @@
             <h3>Данни</h3>
             <p>Информацията за линиите и разписанията е събрана от публични източници:</p>
             <ul>
-                <li><a href="https://transport.obshtinaruse.bg" target="_blank">Община Русе - Транспорт</a></li>
-                <li><a href="https://www.transport-ruse.com/" target="_blank">Общински Транспорт Русе</a></li>
-                <li><a href="https://gtruse.wixsite.com/gtruse" target="_blank">Градски транспорт Русе</a></li>
+                <li><a href="https://transport.obshtinaruse.bg" target="_blank" rel="noopener noreferrer">Община Русе - Транспорт</a></li>
+                <li><a href="https://www.transport-ruse.com/" target="_blank" rel="noopener noreferrer">Общински Транспорт Русе</a></li>
+                <li><a href="https://gtruse.wixsite.com/gtruse" target="_blank" rel="noopener noreferrer">Градски транспорт Русе</a></li>
             </ul>
             <h3>Технологии</h3>
-            <p>Картата използва <a href="https://leafletjs.com" target="_blank">Leaflet.js</a> и <a href="https://www.openstreetmap.org" target="_blank">OpenStreetMap</a>.</p>
+            <p>Картата използва <a href="https://leafletjs.com" target="_blank" rel="noopener noreferrer">Leaflet.js</a> и <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>.</p>
             <p class="disclaimer">Забележка: Маршрутите са приблизителни. За точни разписания проверете официалните източници.</p>
         </div>
     </div>
@@ -271,7 +319,7 @@
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay" role="status" aria-live="polite">
         <div class="loading-spinner" aria-hidden="true"></div>
-        <p>Зареждане на картата...</p>
+        <p data-i18n="loading_map">Зареждане на картата...</p>
     </div>
 
     <!-- Keyboard Shortcuts Modal -->
@@ -285,6 +333,7 @@
                 <div class="shortcut-item"><kbd>D</kbd> <span>Тъмен режим</span></div>
                 <div class="shortcut-item"><kbd>F</kbd> <span>Любими</span></div>
                 <div class="shortcut-item"><kbd>N</kbd> <span>Най-близки спирки</span></div>
+                <div class="shortcut-item"><kbd>P</kbd> <span>Планиране на маршрут</span></div>
                 <div class="shortcut-item"><kbd>R</kbd> <span>Нулирай изгледа</span></div>
                 <div class="shortcut-item"><kbd>L</kbd> <span>Моята локация</span></div>
                 <div class="shortcut-item"><kbd>?</kbd> <span>Покажи помощ</span></div>
@@ -294,9 +343,12 @@
 
     <!-- Leaflet JS (local) -->
     <script src="vendor/leaflet/leaflet.js"></script>
+    <script src="vendor/leaflet-markercluster/leaflet.markercluster.js"></script>
 
     <!-- Application Scripts -->
+    <script src="js/i18n.js"></script>
     <script src="js/data-normalized.js"></script>
+    <script src="js/route-planner.js"></script>
     <script src="js/app.js"></script>
 
     <!-- Service Worker Registration -->

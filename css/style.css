@@ -22,6 +22,26 @@
     --transition: 0.2s ease;
 }
 
+/* Skip Navigation Link */
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: -9999px;
+    z-index: 9999;
+    background: var(--primary-color);
+    color: white;
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.skip-link:focus {
+    left: 16px;
+    top: 8px;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -376,6 +396,19 @@ html, body {
     color: var(--text-secondary);
 }
 
+.cached-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 6px;
+    background: #f59e0b;
+    color: white;
+    border-radius: var(--radius-sm);
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
 .line-route {
     flex: 1;
     overflow-y: auto;
@@ -695,6 +728,66 @@ html, body {
 }
 
 /* ================================
+   Geolocation Error Banner
+   ================================ */
+.geo-error-banner {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #dc2626;
+    color: white;
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    font-size: 0.8125rem;
+    max-width: calc(100% - 32px);
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.geo-error-text {
+    flex: 1;
+}
+
+.geo-error-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.geo-error-retry,
+.geo-error-close {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(255 255 255 / 0.2);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.geo-error-retry:hover,
+.geo-error-close:hover {
+    background: rgb(255 255 255 / 0.3);
+}
+
+[data-theme="dark"] .geo-error-banner {
+    background: #991b1b;
+}
+
+/* ================================
    Leaflet Customizations
    ================================ */
 .leaflet-popup-content-wrapper {
@@ -823,19 +916,67 @@ html, body {
 }
 
 /* Dark mode support for stop search */
-@media (prefers-color-scheme: dark) {
-    .stop-search-results {
-        background: var(--background);
-    }
+[data-theme="dark"] .stop-search-results {
+    background: var(--background);
+}
 
-    .stop-search-card {
-        background: var(--surface);
-        border-color: var(--border-color);
-    }
+[data-theme="dark"] .stop-search-card {
+    background: var(--surface);
+    border-color: var(--border-color);
+}
 
-    .stop-search-card:hover {
-        border-color: var(--primary-color);
-    }
+[data-theme="dark"] .stop-search-card:hover {
+    border-color: var(--primary-color);
+}
+
+/* Stop Cluster & Dot Markers */
+.stop-cluster {
+    background: none !important;
+    border: none !important;
+}
+
+.stop-cluster-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--primary-color);
+    color: white;
+    border: 2px solid white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.3);
+}
+
+.stop-marker-wrapper {
+    background: none !important;
+    border: none !important;
+}
+
+.stop-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+}
+
+.stop-dot.major {
+    width: 16px;
+    height: 16px;
+    background: var(--primary-color);
+}
+
+.stop-dot.regular {
+    background: #3b82f6;
+}
+
+.stop-dot.terminal {
+    width: 14px;
+    height: 14px;
+    background: #1d4ed8;
 }
 
 /* Custom marker styles */
@@ -844,6 +985,74 @@ html, body {
     border: 2px solid white;
     border-radius: 50%;
     box-shadow: 0 2px 4px rgb(0 0 0 / 0.2);
+}
+
+/* Popup content styles */
+.popup-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin: 4px 0 8px;
+}
+
+.popup-lines-arrivals {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.popup-line-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.popup-line-badge[style] {
+    cursor: pointer;
+}
+
+.arrival-info {
+    font-size: 0.75rem;
+    color: var(--bus-color);
+    font-weight: 500;
+}
+
+.arrival-info.not-available {
+    color: #dc2626;
+}
+
+.arrival-info.arriving-soon {
+    color: var(--bus-color);
+    font-weight: 700;
+}
+
+/* Stop search result styles */
+.stop-results-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+.stop-line-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stop-line-route-name {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.stop-line-badge-small {
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 2px 6px;
 }
 
 /* ================================
@@ -928,25 +1137,11 @@ html, body {
 }
 
 /* ================================
-   Dark Mode Support (optional)
+   Dark Mode Support
+   ================================
+   Dark mode is controlled via data-theme="dark" attribute on <html>.
+   OS preference is detected in JS (initDarkMode) and applied as the default.
    ================================ */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --background: #0f172a;
-        --surface: #1e293b;
-        --text-primary: #f1f5f9;
-        --text-secondary: #94a3b8;
-        --border-color: #334155;
-    }
-
-    .search-box input {
-        color: var(--text-primary);
-    }
-
-    .loading-overlay {
-        background: var(--surface);
-    }
-}
 
 /* ================================
    Header Actions
@@ -973,6 +1168,12 @@ html, body {
 
 .header-btn:hover {
     background: var(--border-color);
+}
+
+.lang-label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
 }
 
 .header-btn .icon-dark {
@@ -1235,6 +1436,219 @@ body.is-offline .sidebar {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
+}
+
+/* ================================
+   Route Planner Panel
+   ================================ */
+.route-planner-panel {
+    display: none;
+    flex-direction: column;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--background);
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.route-planner-panel.active {
+    display: flex;
+}
+
+.route-planner-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--surface);
+}
+
+.route-planner-header h3 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+}
+
+.route-planner-form {
+    padding: 12px 16px;
+}
+
+.route-planner-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+}
+
+.route-input-group {
+    position: relative;
+}
+
+.route-input-group label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.route-input-group input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    background: var(--surface);
+    color: var(--text-primary);
+}
+
+.route-input-group input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgb(37 99 235 / 0.1);
+}
+
+.route-suggestions {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+    z-index: 10;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.route-suggestion-item {
+    padding: 8px 12px;
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.route-suggestion-item:hover {
+    background: var(--background);
+}
+
+.route-swap-btn {
+    align-self: center;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.route-swap-btn:hover {
+    background: var(--border-color);
+}
+
+.route-search-btn {
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.route-search-btn:hover {
+    background: var(--primary-dark);
+}
+
+.route-results {
+    padding: 0 16px 12px;
+}
+
+.route-no-results {
+    text-align: center;
+    padding: 16px;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.route-result-card {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.route-result-card:hover {
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-sm);
+}
+
+.route-result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.route-result-badges {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.route-result-badges .line-badge {
+    min-width: 28px;
+    height: 22px;
+    font-size: 0.75rem;
+    padding: 0 6px;
+}
+
+.route-transfer-arrow {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.route-result-meta {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.route-segment {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    padding: 2px 0;
+}
+
+/* Walking Button */
+.walk-btn {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 4px 12px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.walk-btn:hover {
+    background: var(--primary-dark);
 }
 
 /* ================================

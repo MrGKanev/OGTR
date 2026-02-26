@@ -1,29 +1,51 @@
 /**
  * Service Worker for Транспорт Русе PWA
  *
- * Version format: transport-ruse-vX.Y where X is major, Y is build date
- * Update CACHE_VERSION when making changes to cached files
+ * CACHE_VERSION must be incremented when cached files change.
+ * BUILD_DATE should be updated to reflect the latest deployment date.
  */
 
-const CACHE_VERSION = 4;
-const BUILD_DATE = '2026-01-29';
+const CACHE_VERSION = 5;
+const BUILD_DATE = '2026-02-26';
 const CACHE_NAME = `transport-ruse-v${CACHE_VERSION}`;
 const TILES_CACHE_NAME = `${CACHE_NAME}-tiles`;
-const STATIC_ASSETS = [
-    './',
-    './index.html',
-    './css/style.css',
-    './js/data-normalized.js',
-    './js/app.js',
-    './manifest.json',
-    './vendor/leaflet/leaflet.css',
-    './vendor/leaflet/leaflet.js',
-    './vendor/leaflet/images/marker-icon.png',
-    './vendor/leaflet/images/marker-icon-2x.png',
-    './vendor/leaflet/images/marker-shadow.png',
-    './vendor/leaflet/images/layers.png',
-    './vendor/leaflet/images/layers-2x.png'
+const STATIC_ASSET_PATHS = [
+    'index.html',
+    'css/style.css',
+    'js/i18n.js',
+    'js/data-normalized.js',
+    'js/route-planner.js',
+    'js/app.js',
+    'data/route-geometries.json',
+    'manifest.json',
+    'vendor/leaflet/leaflet.css',
+    'vendor/leaflet/leaflet.js',
+    'vendor/leaflet/images/marker-icon.png',
+    'vendor/leaflet/images/marker-icon-2x.png',
+    'vendor/leaflet/images/marker-shadow.png',
+    'vendor/leaflet/images/layers.png',
+    'vendor/leaflet/images/layers-2x.png',
+    'vendor/leaflet-markercluster/leaflet.markercluster.js',
+    'vendor/leaflet-markercluster/MarkerCluster.css',
+    'vendor/leaflet-markercluster/MarkerCluster.Default.css'
 ];
+
+// Build full URLs for caching during install
+const STATIC_ASSETS = STATIC_ASSET_PATHS.map(p => `./${p}`);
+STATIC_ASSETS.unshift('./');
+
+/**
+ * Check if a request URL matches a static asset
+ */
+function isStaticAsset(requestUrl) {
+    const url = new URL(requestUrl);
+    const path = url.pathname;
+    // Match the scope root (e.g. /OGTR/) or any known asset path
+    const scope = self.registration ? self.registration.scope : '';
+    const scopePath = scope ? new URL(scope).pathname : '/';
+    if (path === scopePath || path === scopePath + 'index.html') return true;
+    return STATIC_ASSET_PATHS.some(asset => path.endsWith('/' + asset));
+}
 
 // Install - cache static assets
 self.addEventListener('install', event => {
@@ -83,8 +105,26 @@ self.addEventListener('fetch', event => {
         return;
     }
 
+    // For data files - stale-while-revalidate
+    if (url.pathname.includes('/data/')) {
+        event.respondWith(
+            caches.open(CACHE_NAME).then(cache => {
+                return cache.match(request).then(cached => {
+                    const fetchPromise = fetch(request).then(response => {
+                        if (response.ok) {
+                            cache.put(request, response.clone());
+                        }
+                        return response;
+                    }).catch(() => cached);
+                    return cached || fetchPromise;
+                });
+            })
+        );
+        return;
+    }
+
     // For static assets - cache first
-    if (STATIC_ASSETS.some(asset => request.url.includes(asset))) {
+    if (isStaticAsset(request.url)) {
         event.respondWith(
             caches.match(request)
                 .then(cached => {

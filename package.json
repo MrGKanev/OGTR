@@ -6,9 +6,15 @@
   "scripts": {
     "postinstall": "npm run copy-vendor",
     "copy-vendor": "node scripts/copy-vendor.js",
-    "update": "npm update && npm run copy-vendor"
+    "update": "npm update && npm run copy-vendor",
+    "test": "node --test 'tests/**/*.test.js'",
+    "generate-icons": "node scripts/generate-icons.js"
   },
   "dependencies": {
-    "leaflet": "^1.9.4"
+    "leaflet": "^1.9.4",
+    "leaflet.markercluster": "^1.5.3"
+  },
+  "devDependencies": {
+    "sharp": "^0.34.5"
   }
 }
