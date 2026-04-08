@@ -1447,11 +1447,14 @@
         }
         if (typeof RoutePlanner === 'undefined') return;
 
+        const departureInput = document.getElementById('routeDepartureTime');
+        const departureTime = departureInput && departureInput.value ? departureInput.value : null;
+
         const routes = RoutePlanner.findRoutes(state.routeFromStopId, state.routeToStopId);
-        displayRouteResults(routes);
+        displayRouteResults(routes, departureTime);
     }
 
-    function displayRouteResults(routes) {
+    function displayRouteResults(routes, departureTime) {
         if (!elements.routeResults) return;
         elements.routeResults.textContent = '';
         clearRoutePlannerLayers();
@@ -1492,8 +1495,19 @@
             const meta = document.createElement('div');
             meta.className = 'route-result-meta';
             const time = RoutePlanner.estimateTime(route);
-            meta.textContent = `~${time} мин · ${route.totalStops} спирки` +
+            let metaText = `~${time} мин · ${route.totalStops} спирки` +
                 (route.transfers > 0 ? ` · ${route.transfers} пресядан${route.transfers === 1 ? 'е' : 'ия'}` : '');
+
+            if (departureTime) {
+                const [hours, minutes] = departureTime.split(':').map(Number);
+                const arrival = new Date();
+                arrival.setHours(hours, minutes + time, 0, 0);
+                const arrH = String(arrival.getHours()).padStart(2, '0');
+                const arrM = String(arrival.getMinutes()).padStart(2, '0');
+                metaText += ` · пристигане ~${arrH}:${arrM}`;
+            }
+
+            meta.textContent = metaText;
 
             header.appendChild(badges);
             header.appendChild(meta);
@@ -1851,6 +1865,7 @@
                 const next = I18n.getLanguage() === 'bg' ? 'en' : 'bg';
                 I18n.setLanguage(next);
                 langToggle.querySelector('.lang-label').textContent = next === 'bg' ? 'EN' : 'BG';
+                document.documentElement.lang = next;
             });
             // Set initial label
             langToggle.querySelector('.lang-label').textContent = I18n.getLanguage() === 'bg' ? 'EN' : 'BG';
